@@ -17,6 +17,38 @@
 from datetime import date, datetime
 
 
+class AllChildren(object):
+    """
+    AllChildren object.
+
+    Non-database object containing the returned results of a search
+    for both children and sibling groups.
+    """
+
+    # List of Child database objects
+    children = []
+
+    # List of SiblingGroup objects
+    siblings = []
+
+    def __init__(self, children=[], siblings=[]):
+        """Let's do some type checking upfront to make life a bit easier."""
+        if not ((type(children) == list) and (type(siblings) == list)):
+            raise TypeError("children and siblings must be a list")
+
+        for item in children:
+            if type(item) != Child:
+                raise TypeError("%s is not a Child object." % item)
+
+        for item in siblings:
+            if type(item) != SiblingGroup:
+                raise TypeError("%s is not a SiblingGroup object." % item)
+
+        # If types are all good, create an AllChildren object
+        self.children = children
+        self.siblings = siblings
+
+
 class _DBObject(object):
     """Database object."""
 
