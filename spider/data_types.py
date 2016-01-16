@@ -48,6 +48,55 @@ class AllChildren(object):
         self.children = children
         self.siblings = siblings
 
+    def merge(self, second):
+        """
+        Merge this with s second AllChildren object.
+
+        @type second: AllChildren
+        @param second: A second AllChildren to merge with this one.
+        """
+
+        if type(second) != AllChildren:
+            raise TypeError(
+                "AllChildren can only merge with another AllChildren"
+            )
+
+        for child in second.children:
+            self.children.append(child)
+
+        for group in second.siblings:
+            self.siblings.append(group)
+
+    def add_child(self, child):
+        """
+        Add a child object to list of children.
+
+        @type child: Child
+        @param child: Child object to be added.
+        """
+
+        if type(child) != Child:
+            raise TypeError(
+                "Only child objects can be added to the list of children."
+            )
+
+        self.children.append(child)
+
+    def add_sibling_group(self, group):
+        """
+        Add a SiblingGroup object to list of sibling groups.
+
+        @type group: SiblingGroup
+        @param group: SiblingGroup object to be added.
+        """
+
+        if type(group) != SiblingGroup:
+            raise TypeError(
+                "Only child objects can be added to the list of children."
+            )
+
+        self.children.append(group)
+
 
 class _DBObject(object):
     """Database object."""
