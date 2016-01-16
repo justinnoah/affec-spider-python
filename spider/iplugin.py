@@ -31,11 +31,24 @@ class SitePlugin(Interface):
         Added as an ivar for logging purposes
     """)
 
+    config = Attribute("""
+        @type config: dict
+        @ivar config: configuration options
+    """)
+
     settings_name = Attribute("""
         @type name: String
         @ivar name: config section under [Sites]. Typically this will be the
         same name as the plugin.
     """)
+
+    def __init__(config):
+        """
+        Instantiate a SitePlugin and require config options to be passed.
+
+        @type config: dict
+        @param config: dictionary of key/value options needed by the plugin.
+        """
 
     def get_all():
         """
