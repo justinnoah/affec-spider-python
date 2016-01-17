@@ -20,6 +20,8 @@ import sys
 from configobj import ConfigObj, ConfigObjError
 from twisted.logger import Logger
 
+from plugin import load_database_plugin, load_site_plugins
+
 
 logger = Logger()
 
@@ -76,6 +78,12 @@ def main(logger, config_path=None):
     except [Exception, ConfigObjError], e:
         logger.failure(str(e))
 
+    plugins = load_site_plugins(cfg['sites'])
+    db_plugin = load_database_plugin(cfg['database'])
+    if db_plugin:
+        plugins.append(db_plugin)
+
+    logger.debug("Loaded Plugins:\n%s" % plugins)
 
 if __name__ == '__main__':
     sys.exit(main(Logger()))
