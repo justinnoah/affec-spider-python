@@ -18,6 +18,10 @@ import os
 import sys
 
 from configobj import ConfigObj, ConfigObjError
+from twisted.logger import Logger
+
+
+logger = Logger()
 
 
 def load_config(path="./config.ini"):
@@ -41,15 +45,23 @@ def load_config(path="./config.ini"):
     return config
 
 
-def main(config_path=None):
+def main(logger, config_path=None):
     """
     main.
+
+    @type logger: Logger
+    @param logger:  Twisted logger for output
 
     @type config_path: String
     @param config_path: optional alternative path to a config file
     """
-    cfg = load_config(config_path) if config_path else load_config()
+    logger.debug("Welcome to the jungle!")
+
+    try:
+        cfg = load_config(config_path) if config_path else load_config()
+    except [Exception, ConfigObjError], e:
+        logger.failure(str(e))
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(main(Logger()))
