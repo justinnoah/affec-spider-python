@@ -1,4 +1,3 @@
-
 # Partially created by https://www.gitignore.io/api/vim,python
 
 ### Vim ###
@@ -71,3 +70,6 @@ docs/_build/
 
 # PyBuilder
 target/
+
+### Project Specific ###
+config.ini

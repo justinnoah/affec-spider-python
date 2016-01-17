@@ -42,6 +42,20 @@ def load_config(path="./config.ini"):
 
     config = ConfigObj(cfg_path)
 
+    # Verify the config has at least [sites], [databases], and at
+    # least one plugin for each
+    if 'sites' not in config.sections:
+        raise ConfigObjError("Section [sites] is missing!")
+
+    if 'database' not in config.sections:
+        raise ConfigObjError("Section [database] is missing!")
+
+    if 'plugins' not in config['sites']:
+        raise ConfigObjError("Section [sites] is missing plugins!")
+
+    if 'plugin' not in config['database']:
+        raise ConfigObjError("Section [database] is missing a plugin!")
+
     return config
 
 
