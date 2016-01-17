@@ -1,18 +1,16 @@
 # Plugins for parsing different sites
 # to import data from
 [sites]
+
 # sites plugins have an interface defined
 # by iplugin.SitePlugin. Each plugin listed
 # must expose a variable called plugin that
-# implements the SitePlugin interface.
-
-# plugins with one item must end with a , so the
-# config reader understands it is a list.
-# Multiple site plugins do not need a trailing ,.
+# implements the SitePlugin interface. The
+# following list of plugins to load needs
+# to be comma separated.
 #
-# ex:
-# plugins = texas,
-# plugins = texas, washington
+# ex: plugins = texas
+# ex: plugins = texas, washington
 plugins =
 
 # Plugins may require configuration options
@@ -31,6 +29,7 @@ plugins =
 # Enable a plugin for imputing data from Sites
 # into a database.
 [database]
+
 # databases plugins have an interface defined
 # by iplugin.DatabasePlugin. Only one plugin
 # may be listed at a time and it must expose
@@ -52,4 +51,4 @@ plugin =
 # [[MySQL]]
 # username = wat
 # password = now
-# database = things
+# database = data
