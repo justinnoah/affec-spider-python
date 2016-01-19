@@ -19,6 +19,7 @@ from twisted.logger import Logger
 from zope.interface import implements
 from zope.interface.exceptions import DoesNotImplement
 
+from data_types import Contact
 from iplugin import DBPlugin
 
 
@@ -93,7 +94,12 @@ class Salesforce(object):
 
     def add_contact(self, contact):
         """Add a Contact object to the database."""
-        raise DoesNotImplement("Skeleton only.")
+        if type(contact) is not Contact:
+            raise TypeError(
+                "add_contact requires a Contact object as an argument"
+            )
+        self.log.debug("add_contact: %s" % contact.name())
+        self.sf.Contact.create(contact.as_dict())
 
     def get_contact(self, contact, create=False):
         """Search for `contact` in the database. Create if `create`."""
