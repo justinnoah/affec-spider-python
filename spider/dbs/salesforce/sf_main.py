@@ -68,6 +68,14 @@ class Salesforce(object):
             sandbox=bool(self.config['sandbox']),
         )
 
+    def _query(self, query):
+        """
+        Raw salesforce query.
+
+        INTERNAL USE ONLY - HERE BE DRAGONS!
+        """
+        return self.sf.query(query)
+
     def add_child(self, child):
         """
         Add a Child object to the database.
@@ -102,7 +110,7 @@ class Salesforce(object):
         self.sf.Contact.create(contact.as_dict())
 
     def find_similar_contact(self, contact):
-        """Find and return a list of similar contacts."""
+        """Find and return a list of similar contacts, create if missing."""
         query = """
             SELECT Id,%(fields)s FROM Contact
             WHERE (%(name)s) OR (%(mailing)s)
@@ -178,8 +186,9 @@ class Salesforce(object):
         }
 
         self.log.debug("QUERY:\n%s\n" % final_query)
-        results = self.sf.query(final_query)
+        results = self._query(final_query)
 
+        # FIXME: Need to convert results to proper data types
         if not results.get('totalSize'):
             results = self.add_contact(contact)
 
