@@ -106,6 +106,13 @@ class _DBObject(object):
         self._constant_fields = constants
         self._variable_fields = variables
 
+    def get_variable_fields(self):
+        """
+        @rtype: list(String)
+        @return: A list of keys that can be updated
+        """
+        return list(self._variable_fields.keys())
+
     def update_field(self, key, value):
         """
         Update a single field.
