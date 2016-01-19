@@ -15,6 +15,7 @@
 """Salesforce plugin for AFFEC Spider."""
 
 from simple_salesforce import Salesforce as sfdb
+from twisted.logger import Logger
 from zope.interface import implements
 from zope.interface.exceptions import DoesNotImplement
 
@@ -27,6 +28,8 @@ class Salesforce(object):
     # Let the plugin loader know this is a Database Plugin
     # and thus guarantee an interface
     implements(DBPlugin)
+
+    log = Logger()
 
     settings_name = "Salesforce"
 
