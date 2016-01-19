@@ -314,6 +314,12 @@ class Contact(_DBObject):
 
         super(Contact, self).__init__(name, constants, variables)
 
+    def name(self):
+        return "%s %s" % (
+            self._variable_fields['FirstName'],
+            self._variable_fields['LastName']
+        )
+
 
 class Attachment(_DBObject):
     """Attachment object."""
