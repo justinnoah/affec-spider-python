@@ -18,7 +18,7 @@ import os
 import sys
 
 from configobj import ConfigObj, ConfigObjError
-from twisted.logger import Logger
+from twisted.logger import Logger, globalLogPublisher, textFileLogObserver
 
 from plugin import load_database_plugin, load_site_plugins
 
@@ -61,12 +61,9 @@ def load_config(path="./config.ini"):
     return config
 
 
-def main(logger, config_path=None):
+def main(config_path=None):
     """
     main.
-
-    @type logger: Logger
-    @param logger:  Twisted logger for output
 
     @type config_path: String
     @param config_path: optional alternative path to a config file
@@ -85,5 +82,7 @@ def main(logger, config_path=None):
 
     logger.debug("Loaded Plugins:\n%s" % plugins)
 
+
 if __name__ == '__main__':
-    sys.exit(main(Logger()))
+    globalLogPublisher.addObserver(textFileLogObserver(sys.stdout))
+    sys.exit(main())
