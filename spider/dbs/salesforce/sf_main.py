@@ -19,7 +19,7 @@ from twisted.logger import Logger
 from zope.interface import implements
 from zope.interface.exceptions import DoesNotImplement
 
-from data_types import Contact
+from data_types import Child, Contact, SiblingGroup
 from iplugin import DBPlugin
 
 
@@ -75,6 +75,30 @@ class Salesforce(object):
         INTERNAL USE ONLY - HERE BE DRAGONS!
         """
         return self.sf.query(query)
+
+    def _results_to_childs(self, res):
+        """
+        Convert salesforce Child results into a list of Child objects.
+
+        @type res: OrderedDict
+        @param res: salesforce returned Child
+
+        @rtype: Child
+        @return: salesforce results as a list of Child objects
+        """
+        return []
+
+    def _results_to_sibling_groups(self, res):
+        """
+        Convert salesforce Sibling results into a list of SiblingGroup objects.
+
+        @type res: OrderedDict
+        @param res: salesforce returned SiblingGroup
+
+        @rtype: [SiblingGroup]
+        @return: salesforce results as a list of SiblingGroup objects
+        """
+        return []
 
     def add_child(self, child):
         """
