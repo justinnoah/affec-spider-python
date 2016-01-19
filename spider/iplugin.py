@@ -17,6 +17,9 @@
 from zope.interface import Attribute, Interface
 
 
+InvalidPluginType = TypeError
+
+
 class SitePlugin(Interface):
     """
     A site.
@@ -89,6 +92,17 @@ class DBPlugin(Interface):
 
     Database backend, whether it be MySQL, etc.
     """
+
+    config = Attribute("""
+        @type config: dict
+        @ivar config: configuration options
+    """)
+
+    settings_name = Attribute("""
+        @type name: String
+        @ivar name: config section under [Sites]. Typically this will be the
+        same name as the plugin.
+    """)
 
     def add_child(child):
         """

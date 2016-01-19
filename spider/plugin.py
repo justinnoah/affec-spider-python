@@ -19,7 +19,7 @@ from twisted.logger import Logger
 from zope.interface.exceptions import BrokenImplementation
 from zope.interface.verify import verifyClass, verifyObject
 
-from iplugin import SitePlugin
+from iplugin import DBPlugin, InvalidPluginType, SitePlugin
 
 
 logger = Logger()
@@ -39,19 +39,35 @@ def load_plugin(location, cfg, *args, **kwargs):
     @return: Return either a SitePlugin or DBPlugin
     """
     pth = "%s" % location
+    plugin_types = {
+        'dbs': DBPlugin,
+        'sites': SitePlugin
+    }
+    plugin_type = None
+    for key in plugin_types:
+        if location.startswith(key):
+            plugin_type = plugin_types[key]
+
+    if not plugin_type:
+        raise InvalidPluginType(
+            "Plugin at %s is not (yet) supported." % location
+        )
 
     # import sites.SitePlugin and make sites.SitePlugin.plugin available
     imp = __import__(pth, globals(), locals(), ['plugin'])
     try:
-        verifyClass(SitePlugin, imp.plugin)
+        verifyClass(plugin_type, imp.plugin)
+
         # Instantiate the plugin
         kwargs.update({
             'config': cfg[imp.plugin.settings_name]
         })
         _tmp = imp.plugin(*args, **kwargs)
-        verifyObject(SitePlugin, _tmp)
+        verifyObject(plugin_type, _tmp)
     except [BrokenImplementation, AttributeError], e:
         logger.failure("%s:\n%s" % (location, str(e)))
+    except ImportError, e:
+        logger.failure("Is your plugin configured correctly?\n%s" % e)
 
     return _tmp
 
