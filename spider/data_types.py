@@ -281,11 +281,21 @@ class Contact(_DBObject):
     """Database object."""
 
     def __init__(self):
-        """Init."""
+        """
+        Init.
+
+        FIXME:
+        Much of the following data is hardcoded for TARE. Eventually this Needs
+        to be added to the config or stripped out in some way to make room
+        for any site to import data.
+        """
         name = "Contact__c"
 
         constants = {
-
+            "AccountId": "0014B0000048cGK",
+            "Business_Name__c": "Texas DFPS",
+            "Last_Action__c":
+                "%s entered by TARE spider." % datetime.now().isoformat(' ')
         }
 
         variables = {
@@ -296,7 +306,10 @@ class Contact(_DBObject):
             'MobilePhone': '',
             'OtherPhone': '',
             'Phone': '',
-            'Address': '',
+            'MailingStreet': '',
+            'MailingCity': '',
+            'MailingState': '',
+            'MailingPostalCode': '',
         }
 
         super(Contact, self).__init__(name, constants, variables)
