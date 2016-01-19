@@ -19,7 +19,7 @@ from twisted.logger import Logger
 from zope.interface import implements
 from zope.interface.exceptions import DoesNotImplement
 
-from data_types import Child, Contact, SiblingGroup
+from data_types import AllChildren, Child, Contact, SiblingGroup
 from iplugin import DBPlugin
 
 
@@ -100,6 +100,49 @@ class Salesforce(object):
         """
         return []
 
+    def find_by_case_number(self, case_number, t=None):
+        """Find either Children or SiblingGroups with `case_number`."""
+        self.log.debug(
+            "Finding Children__c with case_number: %s" % case_number
+        )
+
+        # The search criteria is only a case number
+        criteria = {
+            'Case_Number__c': case_number
+        }
+
+        # We are returning an AllChildren type since this method can
+        # be used for either Children__c or Sibling_Group__c
+        results = AllChildren()
+
+        # Type not specified, return both
+        if not t:
+            children = self.get_children_by(criteria)
+            siblings = self.get_sibling_group_by(criteria)
+            for child in self._results_to_childs(children):
+                results.add_child(child)
+            for sibling in self._results_to_sibling_groups(siblings):
+                results.add_sibling_group(sibling)
+        # Return results from Children__c
+        elif type(t) is Child:
+            children = self.get_children_by(criteria)
+            for child in self._results_to_childs(children):
+                results.add_child(child)
+        # Return results from Sibling_Group__c
+        elif type(t) is SiblingGroup:
+            siblings = self.get_sibling_group_by(criteria)
+            for sibling in self._results_to_sibling_groups(siblings):
+                results.add_sibling_group(sibling)
+        # Uh-oh, not good.
+        else:
+            raise TypeError(
+                "find_by_case_number requires "
+                "a type of None, Child, or SiblingGroup"
+            )
+
+        # Returning an AllChildren object with Childs SiblingGroups or both
+        return results
+
     def add_child(self, child):
         """
         Add a Child object to the database.
@@ -108,7 +151,7 @@ class Salesforce(object):
         """
         raise DoesNotImplement("Skeleton only.")
 
-    def get_children_by(self, search_criteria):
+    def get_children_by(self, search_criteria, return_fields=[]):
         """
         Simple query result of a Child objects.
 
@@ -116,22 +159,40 @@ class Salesforce(object):
         @param search_criteria: A dictionary of keys and values
         to search children by.
 
+        @type return_fields: list(String)
+        @param return_fields: The fields the query should return,
+        if none are passed, only Id is returned
+
         @rtype: list
         @return: Return results from salesforce of children Ids only.
         """
         # Query string
-        query_string = "SELECT Id FROM Children__c WHERE %(where_fields)s"
+        query_string = (
+            "SELECT %(select_fields)s FROM Children__c WHERE %(where_fields)s"
+        )
+
+        # select fiesds, we always return at least Id
+        s_fields = ['Id']
+        for field in return_fields:
+            s_fields.append(field)
+
+        # Join the list of s_fields into a string separated by ", "
+        select_fields = " AND ".join(s_fields)
 
         # Parse the dict indo a where clause
-        fields = []
+        w_fields = []
         for k, v in search_criteria:
-            fields.append("%s = '%s'" % (k, v))
+            w_fields.append("%s = '%s'" % (k, v))
 
-        where_fields = " OR ".join(fields)
+        # Join the list of w_filds into a string separated by AND
+        where_fields = " AND ".join(w_fields)
 
         # Use the internal query method to query
         results = self._query(
-            query_string % {'where_fields': where_fields}
+            query_string % {
+                'select_fields': select_fields,
+                'where_fields': where_fields
+            }
         )
 
         # Return results as a list
