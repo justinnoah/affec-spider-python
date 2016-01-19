@@ -108,6 +108,38 @@ class Salesforce(object):
         """
         raise DoesNotImplement("Skeleton only.")
 
+    def get_children_by(self, search_criteria):
+        """
+        Simple query result of a Child objects.
+
+        @type search_criteria: dict
+        @param search_criteria: A dictionary of keys and values
+        to search children by.
+
+        @rtype: list
+        @return: Return results from salesforce of children Ids only.
+        """
+        # Query string
+        query_string = "SELECT Id FROM Children__c WHERE %(where_fields)s"
+
+        # Parse the dict indo a where clause
+        fields = []
+        for k, v in search_criteria:
+            fields.append("%s = '%s'" % (k, v))
+
+        where_fields = " OR ".join(fields)
+
+        # Use the internal query method to query
+        results = self._query(
+            query_string % {'where_fields': where_fields}
+        )
+
+        # Return results as a list
+        if results:
+            return [results] if not type(results) == list else results
+        else:
+            return []
+
     def get_children_count(self):
         """Return the number of Child objects in the database."""
         raise DoesNotImplement("Skeleton only.")
@@ -119,6 +151,38 @@ class Salesforce(object):
         Doing so may also require adding a Contact object as well.
         """
         raise DoesNotImplement("Skeleton only.")
+
+    def get_sibling_group_by(self, search_criteria):
+        """
+        Simple query result of a SiblingGroup objects.
+
+        @type search_criteria: dict
+        @param search_criteria: A dictionary of keys and values
+        to search SiblingGroups by.
+
+        @rtype: list
+        @return: Return results from salesforce of sibling group Ids only.
+        """
+        # Query string
+        query_string = "SELECT Id FROM Sibling_Group__c WHERE %(where_fields)s"
+
+        # Parse the dict indo a where clause
+        fields = []
+        for k, v in search_criteria:
+            fields.append("%s = '%s'" % (k, v))
+
+        where_fields = " OR ".join(fields)
+
+        # Use the internal query method to query
+        results = self._query(
+            query_string % {'where_fields': where_fields}
+        )
+
+        # Return results as a list
+        if results:
+            return [results] if not type(results) == list else results
+        else:
+            return []
 
     def get_sibling_group_count(self):
         """Return the number of SiblingGroup objects in the database."""
