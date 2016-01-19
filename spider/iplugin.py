@@ -149,8 +149,19 @@ class DBPlugin(Interface):
         @type contact: Contact
         @param contact: Contact to add
 
-        @rtrype: C(int)
+        @rtrype: String
         @returns: Contact ID
+        """
+
+    def find_similar_contact(contact):
+        """
+        Lookup a contact with similar data to the contact parameter.
+
+        @type contact: Contact
+        @param contact: Contact which to find similarities of.
+
+        @rtype: list(String)
+        @returns: A list of similar Contacts or an empty list if none
         """
 
     def get_contact(contact, create=False):

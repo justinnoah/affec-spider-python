@@ -101,6 +101,91 @@ class Salesforce(object):
         self.log.debug("add_contact: %s" % contact.name())
         self.sf.Contact.create(contact.as_dict())
 
+    def find_similar_contact(self, contact):
+        """Find and return a list of similar contacts."""
+        query = """
+            SELECT Id,%(fields)s FROM Contact
+            WHERE (%(name)s) OR (%(mailing)s)
+        """
+
+        # Fields to return from the query along with the Id
+        fields = {
+            'MailingStreet': '',
+            'MailingCity': '',
+            'MailingState': '',
+            'MailingPostalCode': '',
+            'FirstName': [],
+            'LastName': '',
+            'Phone': '',
+            'Email': '',
+        }
+
+        # Fields for comparison
+        where_fields = {
+            "FirstName": '',
+            "LastName": '',
+            "MailingPostalCode": '',
+            "MailingStreet": '',
+            "MailingCity": '',
+        }
+
+        for field in fields:
+            data = contact.get_field(field)
+            # Handle first names
+            if field == 'FirstName':
+                # First Name to search
+                fname = data
+                if fname.startswith("bob"):
+                    fields["FirstName"].append('bob')
+                    fields["FirstName"].append('r')
+                elif fname.startswith('rob'):
+                    fields["FirstName"].append('rob')
+                    fields["FirstName"].append('b')
+                elif fname.startswith('will'):
+                    fields["FirstName"].append('will')
+                    fields["FirstName"].append('b')
+                elif fname.startswith('bill'):
+                    fields["FirstName"].append('bill')
+                    fields["FirstName"].append('w')
+                else:
+                    fields["FirstName"].append(fname[0])
+
+                where = ["FirstName LIKE '%s%%'" % x for x in fields[field]]
+                where_fields["FirstName"] = " OR ".join(where)
+            elif field == "LastName":
+                # Store the data in the fields (probably not necessary)
+                fields[field] = data
+                # Only use the first 4 letters of the last name
+                where = "%s = '%s'" % (field, fields[field][0:4])
+                where_fields["LastName"] = where
+            else:
+                fields[field] = data
+                where = "%s = '%s'" % (field, fields[field])
+                where_fields[field] = where
+
+        select_fields = ",".join(fields.keys())
+        fname = where_fields["FirstName"]
+        del where_fields["FirstName"]
+        mailing_list = []
+        for k, v in where_fields:
+            if v:
+                mailing_list.append("%s = '%s'" % (k, v))
+
+        final_query = query % {
+            'fields': select_fields,
+            'name': fname,
+            'mailing': " AND ".join(mailing_list)
+        }
+
+        self.log.debug("QUERY:\n%s\n" % final_query)
+        results = self.sf.query(final_query)
+
+        if not results.get('totalSize'):
+            results = self.add_contact(contact)
+
+        # FIXME: Only handling the one most likely. This Needs to change.
+        return [results] if not type(results) == list else results[0]
+
     def get_contact(self, contact, create=False):
         """Search for `contact` in the database. Create if `create`."""
         raise DoesNotImplement("Skeleton only.")
