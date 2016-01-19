@@ -14,6 +14,7 @@
 
 """Salesforce plugin for AFFEC Spider."""
 
+from simple_salesforce import Salesforce as sfdb
 from zope.interface import implements
 from zope.interface.exceptions import DoesNotImplement
 
@@ -29,9 +30,39 @@ class Salesforce(object):
 
     settings_name = "Salesforce"
 
+    def _check_config(self, config):
+        """Verify the necessary inputs for salesforce are provided."""
+        self.log.debug("Verifying configuration")
+
+        keys = ['username', 'password', 'token', 'sandbox']
+        for key in keys:
+            if key not in config.keys():
+                raise Exception(
+                    "%s is missing '%s' in the configuration." % (
+                        self.settings_name, key
+                    )
+                )
+            elif not config[key]:
+                raise Exception(
+                    "%s is missing a configuration value for '%s'" % (
+                        self.settings_name, key
+                    )
+                )
+
+        return config
+
     def __init__(self, config):
         """Salesforce plugin __init__."""
-        self.config = None
+        # Config
+        self.config = self._check_config(config)
+        # Create a salesforce instance
+        self.log.debug("Create sf instance")
+        self.sf = sfdb(
+            username=self.config['username'],
+            password=self.config['password'],
+            security_token=self.config['token'],
+            sandbox=bool(self.config['sandbox']),
+        )
 
     def add_child(self, child):
         """
