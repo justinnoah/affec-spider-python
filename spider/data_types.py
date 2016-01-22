@@ -101,10 +101,20 @@ class AllChildren(object):
 class _DBObject(object):
     """Database object."""
 
+    # A list of Attachment type objects
+    _attachments = []
+
     def __init__(self, name, constants, variables):
         self.table_name = name
         self._constant_fields = constants
         self._variable_fields = variables
+
+    def get_attachments(self):
+        """
+        @rtype: list(Attachment)
+        @return: A clone of the list of Attachment type objects.
+        """
+        return list(self._attachments)
 
     def get_variable_fields(self):
         """
@@ -157,6 +167,25 @@ class _DBObject(object):
         @returns: a complete Child object as a dict.
         """
         return dict(self._constant_fields.update(self._variable_fields))
+
+    def add_attachment(self, attachment):
+        """
+        Add an Attachment type object to the list of attachments.
+
+        This feels a little janky to have this method attached to the
+        _DBObject, though writing it twice (once for children and siblinggroup)
+        seemed more annoying.
+
+        @type attachment: Attachment
+        @param attachment: Attachment for child/sibling object
+        """
+        if type(attachment) != Attachment:
+            raise TypeError(
+                "Only Attachment objects can be"
+                "added to the list of Attachments."
+            )
+
+        self._attachments.append(attachment)
 
 
 class Child(_DBObject):
@@ -222,6 +251,7 @@ class Child(_DBObject):
             "CW_Update_to_Families__c": (
                 "%s - %s is looking for a home"
             ),
+            "Case_Worker_Contact__c": ""
         }
 
         super(Child, self).__init__(name, constants, variables)
