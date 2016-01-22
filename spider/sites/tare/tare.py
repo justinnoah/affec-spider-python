@@ -14,11 +14,18 @@
 
 """SitePlugin module for Tare."""
 
+import string
+
+from bs4 import BeautifulSoup
+import requests
+from requests.exceptions import HTTPError
 from twisted.logger import Logger
 from zope.interface import implements
 from zope.interface.exceptions import DoesNotImplement
 
+from data_types import AllChildren
 from iplugin import SitePlugin
+from . import only_child_parser, sibling_group_parser
 
 
 class TareSite(object):
@@ -34,14 +41,187 @@ class TareSite(object):
     settings_name = "Tare"
     log = Logger()
 
+    # The form data that the submission requires for a child search
+    search_data = {
+        "Name": "",
+        "Age": "",
+        "Behavioral": "",
+        "Developmental": "",
+        "Emotional": "",
+        "Gender": "",
+        "TAREId": "",
+        "RiskFactors": "",
+        "Physical": "",
+        "Learning": "",
+        "Medical": "",
+        "GroupType": "",
+        "Region": "",
+        "Ethnicity": "",
+        "AA": "false",
+        "AN": "false",
+        "BK": "false",
+        "DC": "false",
+        "HP": "false",
+        "UD": "false",
+        "WT": "false",
+    }
+
     def __init__(self, config):
         """Fire it up."""
-        self.log.debug("TARE plugin starting up.")
-        self.config = config
+        self.log.debug("TARE plugin logging in.")
+        # Verify requirements
+        self.config = self._check_config(config)
+        # Initialize our session, this does cookies and things
+        self.session = requests.Session()
+        # Login!
+        res = self.session.post(
+            "%s/Application/TARE/Account.aspx/Logon" % self.base_url,
+            data={
+                'UserName': self.config['username'],
+                'Password': self.config["password"],
+            }
+        )
+
+        if "Application/TARE/Account.aspx/LogOn" in res.url:
+            raise ValueError("TARE: Invalid Login Credentials")
+
+        self.log.debug("TARE logged in.")
+
+    def _check_config(self, config):
+        """Verify a user/pass for TARE is in the config."""
+        required = ['username', 'password']
+        for key in required:
+            if key not in config.keys():
+                raise Exception(
+                    "%s is missing '%s' in the configuration." % (
+                        self.settings_name, key
+                    )
+                )
+            elif not config[key]:
+                raise Exception(
+                    "%s is missing a configuration value for '%s'" % (
+                        self.settings_name, key
+                    )
+                )
+        return config
 
     def get_all(self):
-        """Tare definition of SitePlugin method."""
-        raise DoesNotImplement("Skeleton only.")
+        """
+        Return AllChildren on the tare website.
+
+        @rtype: AllChildren
+        @return: Returns an AllChildren object of all children and sibling
+        groups found on the Tare website.
+        """
+        # To gather all Children and Sibling Groups from TARE,
+        # a search of all names is required. So, from aa to zz,
+        # all will be searched.
+#        first_name_starts = [
+#            "%s%s" % (x, y)
+#            for x in string.ascii_lowercase for y in string.ascii_lowercase
+#        ]
+        first_name_starts = ['ab']
+        all_children = AllChildren()
+        for fname in first_name_starts:
+            results = self.search_profiles(fname)
+
+        return all_children
+
+    def search_profiles(self, search="ad"):
+        """Search TARE for children with names starting with `search`."""
+        post_url = (
+            "%s/Application/TARE/Search.aspx/NonMatchingSearchResults" %
+            self.base_url
+        )
+
+        # Update POST data with search criteria
+        self.search_data["Name"] = search
+
+        self.log.info("Searching for children starting with %s" % search)
+        req = self.session.post(post_url, self.search_data)
+
+        try:
+            req.raise_for_status()
+        except HTTPError, e:
+            self.log.error("Failed to search for: %s" % search)
+            self.log.failure(e)
+            return []
+
+        html = req.text
+        link_objs = self.parse_search_results(html)
+        solo_links = []
+        self.log.debug("Adding links of only child profiles to be scraped")
+        for only in link_objs.get('only'):
+            solo_links.append("%s%s" % (
+                self.base_url,
+                only.get('href')
+            ))
+        self.log.info("Found %s 'only childs'" % len(solo_links))
+        # Gathering Only child, children
+        solo_children = []
+        self.log.debug("Begin Scraping of only child profiles")
+        for link in solo_links:
+            child = only_child_parser.gather_profile_details_for(
+                link, self.session, self.base_url
+            )
+            solo_children.append(child)
+        #    except Exception, e:
+        #        print("An issue occured with: %s" % link)
+        #        print("%s" % e)
+        #        continue
+
+        sibling_links = []
+        for siblings in link_objs.get('siblings'):
+            sibling_links.append("%s%s" % (
+                self.base_url,
+                siblings.get('href')
+            ))
+
+        self.log.info("Found %s 'sibling groups'" % len(sibling_links))
+        sibling_children = []
+        for link in sibling_links:
+            siblings = sibling_group_parser.gather_profile_details_for(
+                link, self.session, self.base_url
+            )
+            sibling_children.append(siblings)
+        #    except Exception, e:
+        #        print("An issue occured with: %s" % link)
+        #        print("%s" % e)
+        #        continue
+
+        children_links = {
+            'only': solo_children,
+            'group': sibling_children
+        }
+
+        return children_links
+
+    def parse_search_results(self, html):
+        """
+        Parse links from a search.
+
+        @type html: String
+        @param html: Raw HTML from the TARE site.
+
+        @rtype:
+        """
+        children_tags = {
+            'only': [],
+            'siblings': [],
+        }
+
+        # Beautify the html
+        bs = BeautifulSoup(html, 'lxml')
+
+        # Get all the links of 'Child Profiles' and 'Sibiling Profiles'
+        children = bs.table.find_all("a", text="Child Profile")
+        if children:
+            children_tags['only'] = children
+        sibling_groups = bs.table.find_all("a", text="Sibling Profile")
+        if sibling_groups:
+            children_tags['siblings'] = sibling_groups
+
+        return children_tags
 
     def get_child_by_id(self, cid):
         """Tare definition of SitePlugin method."""
