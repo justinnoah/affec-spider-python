@@ -127,7 +127,57 @@ class TareSite(object):
 
         return all_children
 
-    def search_profiles(self, search="ad"):
+    def search_profiles(self, search="aa"):
+        """"""
+        post_url = (
+            "%s/Application/TARE/Search.aspx/NonMatchingSearchResults" %
+            self.base_url
+        )
+
+        # Update POST data with search criteria
+        self.search_data["Name"] = search
+
+        self.log.info("Searching for children starting with %s" % search)
+        req = self.session.post(post_url, self.search_data)
+
+        try:
+            req.raise_for_status()
+        except HTTPError, e:
+            self.log.error("Failed to search for: %s" % search)
+            self.log.failure(e)
+            return []
+
+        # Get the results section of the page
+        html = req.text
+        soup = BeautifulSoup(html, "lxml")
+        search_results = soup.select_one("div#results > ul")
+
+        # Grab each result
+        results_soup = BeautifulSoup(str(search_results), "lxml")
+        self.log.debug("Results_Soup: %s" % results_soup)
+        results = results_soup.select("a.listLink")
+        self.log.debug("Results: %s" % results)
+
+        all_children = AllChildren()
+        # Iterate through the results and grab the link and name
+        for result in results:
+            # Shorten lines up a bit
+            link = "%s%s" % (self.base_url, result.get('href'))
+
+            if "Child.aspx" in link:
+                child = only_child_parser.gather_profile_details_for(
+                    link, self.session, self.base_url
+                )
+                all_children.add_child(child)
+            elif "Group.aspx" in link:
+                group = sibling_group_parser.gather_profile_details_for(
+                    link, self.session, self.base_url
+                )
+                all_children.add_sibling_group(group)
+
+        return all_children
+
+    def search_profiles_old_template(self, search="ad"):
         """Search TARE for children with names starting with `search`."""
         post_url = (
             "%s/Application/TARE/Search.aspx/NonMatchingSearchResults" %
