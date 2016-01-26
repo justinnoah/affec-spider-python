@@ -20,10 +20,11 @@ import sys
 from configobj import ConfigObj, ConfigObjError
 from twisted.logger import Logger, globalLogPublisher, textFileLogObserver
 
+from data_types import AllChildren
 from plugin import load_database_plugin, load_site_plugins
 
 
-logger = Logger()
+log = Logger()
 
 
 def load_config(path="./config.ini"):
@@ -61,6 +62,30 @@ def load_config(path="./config.ini"):
     return config
 
 
+def import_data(plugins):
+    """
+    Using the site plugin(s) import data into the given database.
+
+    @type plugins: dict
+    @param pluigns: {
+        'sites': [SitePluigin,],
+        'database': DBPlugin
+    }
+    """
+    # All the children and siblings groups to be imported
+    all_children = AllChildren()
+
+    log.info("Begin parsing / importing data from sites.")
+    # For each site listed in the config
+    for site in plugins['sites']:
+        # grab all chilrden and sibling groups
+        all_children.merge(site.get_all())
+
+    log.info("db plugin: add_allchildren.")
+    # and import the data
+    plugins['database'].add_allchldren(all_children)
+
+
 def main(config_path=None):
     """
     main.
@@ -68,21 +93,25 @@ def main(config_path=None):
     @type config_path: String
     @param config_path: optional alternative path to a config file
     """
-    logger.debug("Welcome to the jungle!")
+    log.debug("Welcome to the jungle!")
 
     try:
         cfg = load_config(config_path) if config_path else load_config()
     except [Exception, ConfigObjError], e:
-        logger.failure(str(e))
+        log.failure(str(e))
 
-    plugins = load_site_plugins(cfg['sites'])
+    site_plugins = load_site_plugins(cfg['sites'])
     db_plugin = load_database_plugin(cfg['database'])
-    if db_plugin:
-        plugins.append(db_plugin)
-
-    logger.debug("Loaded Plugins:\n%s" % plugins)
+    plugins = {
+        'sites': site_plugins,
+        'database': db_plugin
+    }
+    import_data(plugins)
 
 
 if __name__ == '__main__':
+    globalLogPublisher.addObserver(
+        textFileLogObserver(open("spider.log", 'w'))
+    )
     globalLogPublisher.addObserver(textFileLogObserver(sys.stdout))
     sys.exit(main())
