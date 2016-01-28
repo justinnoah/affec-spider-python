@@ -87,21 +87,49 @@ def parse_child_info(link, soup):
     except ValueError:
         pass
 
+    tare_provided_fields = {
+        "Name": "Name",
+        "Age": "Child_s_Birthdate__c",
+        "Race": "Child_s_Nationality__c",
+        "Gender": "Child_s_Sex__c",
+        "Ethnicity": "Child_s_Nationality__c",
+        "Region": "District__c",
+        "Primary Language": "Child_s_Primary_Language__c",
+    }
+
+    def grab_data(current, itr):
+        field = current.text.strip()
+
+        # Handle special parsing requirements
+        if field == "Age":
+            value = get_birthdate(next(itr).text.strip())
+        elif field in ["Ethnicity", "Race"]:
+            value = child_info.get_field(tare_provided_fields[field])
+            value.append(next(itr).text.strip())
+        elif field in tare_provided_fields.keys():
+            value = next(itr).text.strip()
+        # Short circuit if nothing relavent found
+        else:
+            return None
+
+        # Update child_info field
+        child_info.update_field(tare_provided_fields[field], value)
+
     log.debug("Begin Child Fields")
     fields = iter(soup.find("span", text="Name").parent.parent.select("> div"))
     for field in fields:
-        # Grab the name
-        if "Name" in field.text:
-            child_info.update_field("Name", next(fields).text.strip())
-        # For some reason, Age and Gender are grouped together...
-        elif "Age" in field.text:
-            fs = iter(field.select("div"))
-            for f in fs:
-                if "Age" in f.text:
-                    bday = get_birthdate(next(fs).text.strip())
-                    child_info.update_field('Child_s_Birthdate__c', bday)
-                    log.debug("bday: %s" % bday)
+        # Only one div should be proccessed,
+        # if multiple exist, let's break it down
+        rabbit_hole = field.select("div")
+        fs = iter(rabbit_hole)
+        # Given sub-fields, lets check them
+        if len(rabbit_hole):
+            for rabbit_itr in fs:
+                grab_data(rabbit_itr, fs)
+        else:
+            grab_data(field, fields)
 
+    # Return Data
     return child_info
 
 
@@ -189,7 +217,7 @@ def parse_attachments(child, session, souped, base_url):
     for img in profile_image_data:
         for k, v in img.iteritems():
             name = "-%s-%s.jpg" % (
-                child_name, str(random.randInt(100, 999))
+                child.get_field("Name"), str(random.randInt(100, 999))
             )
             child.add_attachment((create_attachment(v, name)))
 
