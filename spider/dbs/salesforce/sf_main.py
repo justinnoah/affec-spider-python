@@ -100,6 +100,28 @@ class Salesforce(object):
         """
         return []
 
+    def add_all(self, all_of_them):
+        """Import an AllChildren object into the database."""
+        if type(all_of_them) is not AllChildren:
+            raise TypeError(
+                "%s != AllCheldren: db.add_all can only add "
+                "AllChildren objects to the database." % type(all_of_them)
+            )
+
+        # Start with Children
+        children = all_of_them.get_children()
+        for child in children:
+            # We do not save the return value as it
+            # is not needed for anything here.
+            self.add_child(child)
+
+        # Finish with SiblingGroups
+        sgroups = all_of_them.get_siblings()
+        for sgroup in sgroups:
+            # We do not save the return value as it
+            # is not needed for anything here.
+            self.add_sibling_group(sgroup)
+
     def find_by_case_number(self, case_number, t=None):
         """Find either Children or SiblingGroups with `case_number`."""
         self.log.debug(
@@ -149,7 +171,24 @@ class Salesforce(object):
 
         Doing so may also require adding a Contact object as well.
         """
-        raise DoesNotImplement("Skeleton only.")
+        if type(child) is not Child:
+            raise TypeError(
+                "%s != Child: Can only add Child "
+                "objects to the database as Child objects" % type(child)
+            )
+
+        # Check for a contact and add it first
+        contact = child.get_field("Case_Worker_Contact__c")
+        if type(contact) == Contact:
+            returned = self.find_similar_contact(contact, create=True)
+            child.update_field(
+                'Case_Worker_Contact__c',
+                returned.get('Id')
+            )
+        else:
+            child.update_field('Case_Worker_Contact__c', '')
+
+        return self.sf.Children__c.create(child.as_dict())
 
     def get_children_by(self, search_criteria, return_fields=[]):
         """
@@ -211,7 +250,29 @@ class Salesforce(object):
 
         Doing so may also require adding a Contact object as well.
         """
-        raise DoesNotImplement("Skeleton only.")
+        if type(sgroup) is not SiblingGroup:
+            raise TypeError(
+                "%s != SiblingGroup: Can only add SiblingGroup "
+                "objects to the database as SiblingGroups" % type(sgroup)
+            )
+        # Child reference Id string
+        reference_str = "Child_%d_First_Name__c"
+
+        # Given a sibling group, the children should be added first
+        children = sgroup.get_children()
+        for num, child in enumerate(children):
+            added_child = self.add_child(child)
+            sgroup.update_field(
+                # enumerate starts at 0, the references start at 1
+                reference_str % num + 1,
+                added_child.get("Id")
+            )
+
+        contact = sgroup.get_field("Caseworker__c")
+        added_contact = self.find_similar_contact(contact, create=True)
+        sgroup.update_field('Caseworker__c', added_contact.get_field("Id"))
+
+        return self.sf.Sibling_Group__c.create(sgroup.as_dict())
 
     def get_sibling_group_by(self, search_criteria):
         """
@@ -258,7 +319,7 @@ class Salesforce(object):
         self.log.debug("add_contact: %s" % contact.name())
         self.sf.Contact.create(contact.as_dict())
 
-    def find_similar_contact(self, contact):
+    def find_similar_contact(self, contact, create=False):
         """Find and return a list of similar contacts, create if missing."""
         query = """
             SELECT Id,%(fields)s FROM Contact
@@ -338,7 +399,7 @@ class Salesforce(object):
         results = self._query(final_query)
 
         # FIXME: Need to convert results to proper data types
-        if not results.get('totalSize'):
+        if not results.get('totalSize') and create:
             results = self.add_contact(contact)
 
         # FIXME: Only handling the one most likely. This Needs to change.
