@@ -68,6 +68,21 @@ class Salesforce(object):
             sandbox=bool(self.config['sandbox']),
         )
 
+        self.nationalities = []
+
+        # Grab all metadata
+        all_field_metadata = self.sf.Children__c.describe()['fields']
+        for field in all_field_metadata:
+            if field.get("name") == "Child_s_Nationality__c":
+                # Grab the Nationality picklist labels
+                if "picklistValues" in field.keys():
+                    for value_dict in field["picklistValues"]:
+                        # Must get the label. We don't want to add "None" to
+                        # the list.
+                        label = value_dict.get('label')
+                        if label:
+                            self.nationalities.append(label)
+
     def _query(self, query):
         """
         Raw salesforce query.
