@@ -205,6 +205,11 @@ def valid_address(addr):
     return us_address
 
 
+def valid_email(email):
+    """Placeholder until is_email is renamed."""
+    return is_email(email)
+
+
 def is_email(email):
     """
     Simple email validator.
@@ -218,20 +223,20 @@ def is_email(email):
 
     # At least 3 characters are required for a valid email
     if email_len < 3:
-        return False
+        return None
 
     # Short circuit on invalid findings
     for i, v in enumerate(email):
         if v == '@':
             count += 1
             if i in [0, email_len]:
-                return False
+                return None
             elif count > 1:
-                return False
+                return None
 
     # Upon searching the entire "email address" and the loop wasn't
     # short circuited, a valid email was passed
-    return True
+    return email
 
 
 def is_age(age):
