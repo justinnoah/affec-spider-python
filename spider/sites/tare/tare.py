@@ -116,22 +116,24 @@ class TareSite(object):
         # To gather all Children and Sibling Groups from TARE,
         # a search of all names is required. So, from aa to zz,
         # all will be searched.
-        first_name_starts = [
-            "%s%s" % (x, y)
-            for x in string.ascii_lowercase for y in string.ascii_lowercase
-        ]
-        # first_name_starts = ['ab']
+#        first_name_starts = [
+#            "%s%s" % (x, y)
+#            for x in string.ascii_lowercase for y in string.ascii_lowercase
+#        ]
+        first_name_starts = ['ab']
         all_children = AllChildren()
         for fname in first_name_starts:
+            self.log.debug("Searching: %s" % fname)
             results = self.search_profiles(fname)
+            self.log.debug("Merging: %s" % fname)
             all_children.merge(results)
 
+        self.log.debug("Returning all")
         return all_children
 
     def search_profiles(self, search="aa"):
         """
         TARE decided to revamp their search page.
-        Thankfully it is *much* easier to parse.
 
         @type search: String
         @param search: Name parameter for search
@@ -140,6 +142,9 @@ class TareSite(object):
         @return: An AllChildren object containing the parsed data of the
         children and sibling groups found by the search
         """
+        # The children and sibling groups to return
+        all_children = AllChildren()
+
         search_post_url = (
             "%s/Application/TARE/Search.aspx/NonMatchingSearchResults" %
             self.base_url
@@ -156,7 +161,7 @@ class TareSite(object):
         except HTTPError, e:
             self.log.error("Failed to search for: %s" % search)
             self.log.failure(e)
-            return []
+            return all_children
 
         # Get the results section of the page
         html = req.text
@@ -166,9 +171,6 @@ class TareSite(object):
         # Grab each result
         results_soup = BeautifulSoup(str(search_results), "lxml")
         results = results_soup.select("a.listLink")
-
-        # The children and sibling groups to return
-        all_children = AllChildren()
 
         # Iterate through the results and grab the link and name
         for result in results:
@@ -186,9 +188,11 @@ class TareSite(object):
                 group = sibling_group_parser.gather_profile_details_for(
                     link, self.session, self.base_url
                 )
+                self.log.debug("group: %s" % group)
                 all_children.add_sibling_group(group)
 
         # Returned the parsed data
+        self.log.debug("Returning results for: %s" % search)
         return all_children
 
     def search_profiles_old_template(self, search="ad"):

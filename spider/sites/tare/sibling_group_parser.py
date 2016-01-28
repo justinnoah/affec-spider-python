@@ -20,6 +20,7 @@ from twisted.logger import Logger
 from data_types import Contact, SiblingGroup
 from only_child_parser import gather_profile_details_for as gather_child
 from utils import parse_name
+from validators import valid_email, valid_phone
 
 log = Logger()
 
@@ -37,12 +38,12 @@ CHILD_SELECTORS = {
         "div#pageContent > div > div:nth-of-type(6) > div:nth-of-type(2)"
     ),
     "Children_s_Bio__c": [
-        "div#pageContent > div > div:nth-of-type(8)",
-        "div#pageContent > div > div:nth-of-type(9)",
-        "div#pageContent > div > div:nth-of-type(10)",
-        "div#pageContent > div > div:nth-of-type(11)",
-        "div#pageContent > div > div:nth-of-type(12)",
-        "div#pageContent > div > div:nth-of-type(13)",
+        "> div:nth-of-type(8)",
+        "> div:nth-of-type(9)",
+        "> div:nth-of-type(10)",
+        "> div:nth-of-type(11)",
+        "> div:nth-of-type(12)",
+        "> div:nth-of-type(13)",
     ],
 }
 
@@ -81,24 +82,28 @@ def parse_case_worker_details(souped):
         TareId, Name, Email, Address, Region, County
         """
         cw_data = {}
-        cw_fields = Contact().get_variable_fields()
-        for field in cw_fields:
-            _selector = CONTACT_SELECTORS.get(field)
 
-            if _selector:
-                selector = "%s > %s" % (CASE_WORKER_SELECTOR, _selector)
-                _selected = souped.select_one(selector)
-                if _selected:
-                    selected = _selected.text.strip()
-                    if field.endswith("Name"):
-                        names = parse_name(selected)
-                        cw_data.update(names)
-                    else:
-                        cw_data.update({field: selected})
-            else:
-                log.info(
-                    "%s not yet supported for Sibling Group page" % field
+        divs = iter(souped.select("> div"))
+        for div in divs:
+            if "TARE Coord" in div.text:
+                cw_data.update(
+                    parse_name(
+                        div.select_one("div:nth-of-type(2)").text.strip()
+                    )
                 )
+            elif "Phone" in div.text:
+                phone = valid_phone(
+                    div.select_one("div:nth-of-type(2)").text.strip()
+                )
+                if phone:
+                    cw_data["Phone"] = phone
+            elif "Email" in div.text:
+                email = valid_email(
+                    div.select_one("div:nth-of-type(2)").text.strip()
+                )
+                if email:
+                    cw_data["Email"] = email
+
         return cw_data
 
 
@@ -111,9 +116,9 @@ def gather_profile_details_for(link, session, base_url):
     log.debug("Cloning siblings, contact, and fields objects")
     log.info("Sibling Group:\n%s" % link)
     # Data required to have for a sibling group
-    siblings_info = SiblingGroup()
+    sibling_group = SiblingGroup()
     contact_info = Contact()
-    fields = list(siblings_info.get_variable_fields())
+    fields = list(sibling_group.get_variable_fields())
 
     # "Import" the html into BeautifulSoup for easy traversal
     req = session.get(link)
@@ -122,9 +127,12 @@ def gather_profile_details_for(link, session, base_url):
     html_data = req.text
     souped = BeautifulSoup(html_data, 'lxml')
 
-    # Parse Case Worker data for the group
     log.debug("Parsing Caseworker data for Sibling Group")
-    cw_data = parse_case_worker_details(souped)
+    cw_soup = souped.find(
+        "span", string="TARE Coordinator"
+    ).parent.parent.parent
+    # Parse Case Worker data for the group
+    cw_data = parse_case_worker_details(cw_soup)
     contact_info.update_fields(cw_data)
 
     log.info("Begin parsing child links from: %s" % link)
@@ -132,35 +140,50 @@ def gather_profile_details_for(link, session, base_url):
     children_in_group = parse_children_in_group(souped, session, base_url)
     log.info("Done with: %s" % link)
     names = [
-        child["child_info"].get_field("Name") for child in children_in_group
+        child.get_field("Name") for child in children_in_group
     ]
-    siblings_info.update_field("Name", ", ".join(names))
+    sibling_group.update_field("Name", ", ".join(names))
     fields.remove("Name")
+
+    divs = cw_soup.select("> div")
+    tare_id = divs[1].text.strip()
+    region = divs[3].text.strip()
+    sibling_group.update_field("Case_Number__c", tare_id)
+    fields.remove("Case_Number__c")
 
     for field in fields:
         selector = CHILD_SELECTORS.get(field)
-        if type(selector) is list:
+        if field == "Children_s_Bio__c":
+            # Start with a blank bio
             bio = ""
-            for s in selector:
-                bio += souped.select_one(s).text.strip()
-            siblings_info.update_field(field, bio)
+            headers = souped.find_all("div.groupHeader")
+            bodies = souped.find_all("div.groupBody")
+            zipped = zip(headers, bodies)
+
+            # Add all the headers and bodies to the bio
+            for header, body in zipped:
+                bio += "%s\n%s\n\n" % (header.text.strip(), body.text.strip())
+
+            # Update siblings' bio
+            sibling_group.update_field(field, bio.strip())
         elif selector:
+            log.debug("selector: %s" % selector)
             _selected = souped.select_one(selector)
-            siblings_info.update_field(
+            sibling_group.update_field(
                 field,
                 _selected.text.strip() if _selected else ""
             )
         else:
             log.info("%s not yet supported for Siblings" % field)
 
-    sibling_group = {
-        "siblings_info": siblings_info,
-        'contact_info': contact_info,
-        'children_in_group': children_in_group,
-    }
+    for child in children_in_group:
+        sibling_group.add_child(child)
+
+    sibling_group.update_field('Caseworker__c', contact_info)
 
     log.debug(
         "Child data successfully generated. Returning `%s`" %
-        sibling_group["siblings_info"].get_field("Name")
+        sibling_group.get_field("Name")
     )
+
     return sibling_group

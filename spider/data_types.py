@@ -16,6 +16,11 @@
 
 from datetime import date, datetime
 
+from twisted.logger import Logger
+
+
+log = Logger()
+
 
 class AllChildren(object):
     """
@@ -56,16 +61,31 @@ class AllChildren(object):
         @param second: A second AllChildren to merge with this one.
         """
 
+        log.debug("Begin merge")
         if type(second) != AllChildren:
             raise TypeError(
                 "AllChildren can only merge with another AllChildren"
             )
+        else:
+            log.debug("Merge: 2nd type checks out, begin")
 
-        for child in second.children:
-            self.children.append(child)
+        log.debug("Merging children into AllChildren")
+        log.debug("Second.children: %s" % second.children)
+        for child in second.get_children():
+            if child not in self.children:
+                log.debug("Adding Child: %s" % child)
+                self.children.append(child)
 
-        for group in second.siblings:
-            self.siblings.append(group)
+        log.debug("Merging SiblingGroups into AllChildren")
+        for group in second.get_siblings():
+            if group not in self.siblings:
+                log.debug("Adding Group: %s" % group)
+                self.siblings.append(group)
+
+        log.debug(
+            "Merge: Finished.\nMerge: %s\nMerge: %s" %
+            (self.children, self.siblings)
+        )
 
     def add_child(self, child):
         """
@@ -82,6 +102,9 @@ class AllChildren(object):
 
         self.children.append(child)
 
+    def get_children(self):
+        return list(self.children)
+
     def add_sibling_group(self, group):
         """
         Add a SiblingGroup object to list of sibling groups.
@@ -95,7 +118,10 @@ class AllChildren(object):
                 "Only child objects can be added to the list of children."
             )
 
-        self.children.append(group)
+        self.siblings.append(group)
+
+    def get_siblings(self):
+        return list(self.siblings)
 
 
 class _DBObject(object):
@@ -187,6 +213,9 @@ class _DBObject(object):
 
         self._attachments.append(attachment)
 
+    def __str__(self):
+        return "%s: %s" % (type(self), self.get_field('Name'))
+
 
 class Child(_DBObject):
     """Child object."""
@@ -256,12 +285,18 @@ class Child(_DBObject):
 
         super(Child, self).__init__(name, constants, variables)
 
+    def __str__(self):
+        return "Child: %s" % self._variable_fields["Name"]
+
 
 class SiblingGroup(_DBObject):
     """SiblingGroup object."""
 
     def __init__(self):
         """Init."""
+        # List of Child objects in the SiblingGroup
+        self.children = []
+
         # Table name constant
         name = "Sibling_Group__c"
 
@@ -312,6 +347,17 @@ class SiblingGroup(_DBObject):
         }
 
         super(SiblingGroup, self).__init__(name, constants, variables)
+
+    def add_child(self, child):
+        if type(child) == Child:
+            self.children.append(child)
+        else:
+            raise TypeError(
+                "Only Child objects can be added to children lists"
+            )
+
+    def get_children(self):
+        return list(self.children)
 
 
 class Contact(_DBObject):

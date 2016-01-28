@@ -13,13 +13,16 @@
 #  limitations under the License.
 
 """Tare helper functions to parse children pages."""
+import random
 import re
 
 from bs4 import BeautifulSoup
 from twisted.logger import Logger
 
 from data_types import Child, Contact
-from utils import create_attachment, get_birthdate, get_pictures_encoded
+from utils import (
+    create_attachment, get_birthdate, get_pictures_encoded, parse_name
+)
 from validators import dict_of_validators as validators
 
 log = Logger()
@@ -46,109 +49,84 @@ CHILD_SELECTORS = {
         "div##Information > div:nth-of-type(6) > p",
         "div##Information > div:nth-of-type(8) > p",
     ],
+}
+
+CONTACT_SELECTORS = {
+    "Name": "Name",
+    "Address": "MailingStreet",
+    "Email Address": "Email",
+    "Phone Number": "Phone"
+}
+
+ATTACHMENT_SELECTORS = {
     "profile_picture": "div##Information > div:nth-of-type(1) > a > img",
     "other_pictures": "div#contentGallery > div > div > a > img",
 }
 
-CONTACT_BASE = "div##Information > div > div > fieldset"
-CONTACT_SELECTORS = {
-    "Name": (
-        "> div:nth-of-type(1) > div:nth-of-type(2)"
-    ),
-    "MailingStreet": (
-        "> div:nth-of-type(2) > div:nth-of-type(2) > span"
-    ),
-    "Email": (
-        "> div:nth-of-type(3) > div:nth-of-type(2) > span"
-    ),
-    "Phone": (
-        "> div:nth-of-type(4) > div:nth-of-type(2) > span"
-    ),
-}
 
-
-def gather_profile_details_for(link, session, base_url):
+def parse_child_info(link, soup):
     """
-    Given a TARE URL, pull the following data about a child.
+    Parse Child data from a swirl of soup.
 
-    Photos, Name, TareId, Age (to be converted to a birthdate), others
+    @type soup: BeautifulSoup data
+    @param soup: Chunk of a webpage containing the child info.
+
+    @rtype: Child
+    @return: Child object filled in with data from the soup.
     """
-    log.debug("Cloning child, contact, and fields objects")
-    log.info("Only Child:\n%s" % link)
-    # Data required to have for a child
     child_info = Child()
-    contact_info = Contact()
     child_fields = list(child_info.get_variable_fields())
-    contact_filds = list(contact_info.get_variable_fields())
-
-    # "Import" the html into BeautifulSoup for easy traversal
-    req = session.get(link)
-    if "/Application/TARE/Home.aspx/Error" in req.url:
-        raise Exception("TARE Server had an error for link: %s" % link)
-
-    html_data = req.text
-
-    souped = BeautifulSoup(html_data, 'lxml')
-    with open("test.html", "wb") as t:
-        t.write(souped.prettify().encode('utf8'))
 
     # Handle Special Cases
-    selector = CHILD_SELECTORS.get("Child_s_Birthdate__c")
     child_info.update_fields({
-        "Child_s_Birthdate__c": get_birthdate(souped, selector),
         "Link_to_Child_s_Page__c": link
     })
 
     try:
         child_fields.remove('Link_to_Child_s_Page__c')
-        child_fields.remove('Child_s_Birthdate__c')
     except ValueError:
         pass
 
     log.debug("Begin Child Fields")
-    for field in child_fields:
-        selector = CHILD_SELECTORS.get(field)
-        if not selector:
-            log.info("%s not yet supported" % field)
-            continue
-        elif type(selector) is list:
-            info = ""
-            for s in selector:
-                x = souped.select_one(s)
-                if x:
-                    info += u"%s" % x.text
-        else:
-            selected = souped.select_one(selector)
-            if selected:
-                info = unicode(
-                    selected.text.strip()
-                )
-        log.debug("Field: %s, Info: %s" % (field, info))
-        child_info.update_field(field, info)
+    fields = iter(soup.find("span", text="Name").parent.parent.select("> div"))
+    for field in fields:
+        # Grab the name
+        if "Name" in field.text:
+            child_info.update_field("Name", next(fields).text.strip())
+        # For some reason, Age and Gender are grouped together...
+        elif "Age" in field.text:
+            fs = iter(field.select("div"))
+            for f in fs:
+                if "Age" in f.text:
+                    bday = get_birthdate(next(fs).text.strip())
+                    child_info.update_field('Child_s_Birthdate__c', bday)
+                    log.debug("bday: %s" % bday)
 
-    log.debug("Begin Contact Fields")
-    small_soup = souped.select(CONTACT_BASE)[0]
-    for field in contact_filds:
-        selector = CONTACT_SELECTORS.get(field)
-        if not selector:
-            log.info("%s not yet supported" % field)
-            continue
-        else:
-            selected = small_soup.select_one(selector)
-            if selected:
-                info = unicode(
-                    selected.string.strip()
-                )
+    return child_info
 
-        if field == "Name":
-            name_split = info.split(' ')
-            contact_info.update_fields({
-                "FirstName": name_split[0],
-                "LastName": name_split[-1]
-            })
+
+def parse_contact_info(soup):
+    """
+    Parse Contact data from a swirl of soup.
+
+    @type soup: BeautifulSoup data
+    @param soup: Chunk of a webpage containing the contact info.
+
+    @rtype: Contact
+    @return: Contact object filled in with data from the soup.
+    """
+    contact_info = Contact()
+    contact_fields = list(contact_info.get_variable_fields())
+
+    cw_soup = iter(soup.select("fieldset > div"))
+
+    for field in cw_soup:
+        info = parse_name(next(cw_soup).text.strip())
+        if field.text == "Name":
+            contact_info.update_fields(parse_name(info))
         elif field == "Phone":
             contact_info.update_field("Phone", validators["phone"](info))
-        elif field == "MailingStreet":
+        elif field == "Address":
             cleaned_re = re.compile("\s+")
             info = cleaned_re.sub(" ", info)
             address = validators["address"](info.strip())
@@ -179,44 +157,81 @@ def gather_profile_details_for(link, session, base_url):
                 contact_info.update_fields(address_fields)
             except:
                 pass
-        else:
-            contact_info.update_field(field, info)
+        elif "Email Address" in field.text:
+            contact_info.update_field("Email", info)
 
-    attachments = []
+    return contact_info
 
+
+def parse_attachments(child, session, souped, base_url):
+    """
+    Parse Contact data from a swirl of soup.
+
+    @type soup: BeautifulSoup data
+    @param soup: Chunk of a webpage containing the contact info.
+
+    @rtype: Contact
+    @return: Contact object filled in with data from the soup.
+    """
     # Get the profile picture attachment
     profile_image_data = get_pictures_encoded(
         session, souped, CHILD_SELECTORS.get("profile_picture"), base_url, True
     )
 
-    # Create attachments for the profile and thumbnail pictures
-    for img in profile_image_data:
-        for k, v in img.iteritems():
-            suffix = "_%s.jpg" % k
-            name = "%s%s" % (child_info.get_field("Name"), suffix)
-            attachments.append(create_attachment(v, name))
-
     # Get other images
     other_images = get_pictures_encoded(
-        session, souped, CHILD_SELECTORS.get("other_pictures"), base_url, False
+        session, souped,
+        ATTACHMENT_SELECTORS.get("other_pictures"),
+        base_url, False
     )
 
-    # Create attachments of the other images and append a number to the name
+    # Create attachments for the profile and thumbnail of the profile
+    for img in profile_image_data:
+        for k, v in img.iteritems():
+            name = "-%s-%s.jpg" % (
+                child_name, str(random.randInt(100, 999))
+            )
+            child.add_attachment((create_attachment(v, name)))
+
+    # Create attachments of all other images and append a number to the name
     for i, img in enumerate(other_images):
-        suffix = "_%d.jpg" % i
-        name = "%s%s" % (child_info.get_field("Name"), suffix)
         # For non-Profile pictures, we just want the full image.
         # thumbnail is None anyway
-        attachments.append(create_attachment(img.get("full"), name))
+        name = "-%s-%s.jpg" % (
+            child.get_field("Name"), str(random.randInt(100, 999))
+        )
+        child.add_attachment((create_attachment(img.get("full"), name)))
 
-    child = {
-        "child_info": child_info,
-        "attachments": attachments,
-        'contact_info': contact_info,
-    }
+
+def gather_profile_details_for(link, session, base_url):
+    """
+    Given a TARE URL, pull the following data about a child.
+
+    Photos, Name, TareId, Age (to be converted to a birthdate), others
+    """
+    log.info("Only Child:\n%s" % link)
+    # Data required to have for a child
+
+    # "Import" the html into BeautifulSoup for easy traversal
+    req = session.get(link)
+    if "/Application/TARE/Home.aspx/Error" in req.url:
+        raise Exception("TARE Server had an error for link: %s" % link)
+
+    # HTML data from the request
+    html_data = req.text
+
+    # Parse the html for Child data scraping
+    souped = BeautifulSoup(html_data, 'lxml')
+    child = parse_child_info(link, souped)
+
+    # Get a smaller soup for the contact data since it's contained in one area
+    contact = parse_contact_info(souped)
+
+    # Add the contact to childself.Case_Worker_Contact__c
+    child.update_field("Case_Worker_Contact__c", contact)
 
     log.debug(
         "Child data successfully generated. Returning `%s`" %
-        child["child_info"].get_field("Name")
+        child.get_field("Name")
     )
     return child

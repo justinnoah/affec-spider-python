@@ -51,17 +51,15 @@ def parse_name(name_copy):
     return info
 
 
-def get_birthdate(souped, selector):
+def get_birthdate(age):
     """
     Calculatie child's birthdate.
 
     Pull the child's age, calculaties a birthdate with a six month accuracy.
     """
-    # Special case for the binthdate
-    age = int(souped.select(selector)[0].string.strip())
-    log.debug("get_birthdate> age: %s" % age)
+    age = int(age)
     today = date.today()
-    six_months = relativedelta(months=6)
+    six_months = relativedelta(years=age, months=6)
     bday = today - six_months
     info = unicode(bday.isoformat())
     return info
