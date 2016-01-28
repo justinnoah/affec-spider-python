@@ -83,7 +83,7 @@ def import_data(plugins):
 
     log.info("db plugin: add_allchildren.")
     # and import the data
-    plugins['database'].add_allchldren(all_children)
+    plugins['database'].add_all(all_children)
 
 
 def main(config_path=None):

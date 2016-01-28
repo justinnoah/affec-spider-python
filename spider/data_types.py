@@ -70,13 +70,14 @@ class AllChildren(object):
             log.debug("Merge: 2nd type checks out, begin")
 
         log.debug("Merging children into AllChildren")
-        log.debug("Second.children: %s" % second.children)
+        log.debug("Second.children: %s" % second.get_children())
         for child in second.get_children():
             if child not in self.children:
                 log.debug("Adding Child: %s" % child)
                 self.children.append(child)
 
         log.debug("Merging SiblingGroups into AllChildren")
+        log.debug("Second.siblings: %s" % second.get_siblings())
         for group in second.get_siblings():
             if group not in self.siblings:
                 log.debug("Adding Group: %s" % group)
@@ -280,7 +281,9 @@ class Child(_DBObject):
             "CW_Update_to_Families__c": (
                 "%s - %s is looking for a home"
             ),
-            "Case_Worker_Contact__c": ""
+            "Case_Worker_Contact__c": "",
+            # Multi-picklist
+            "Child_s_Nationality__c": [],
         }
 
         super(Child, self).__init__(name, constants, variables)
