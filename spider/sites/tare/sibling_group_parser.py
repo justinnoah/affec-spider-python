@@ -122,8 +122,14 @@ def gather_profile_details_for(link, session, base_url):
 
     # "Import" the html into BeautifulSoup for easy traversal
     req = session.get(link)
-    if "/Application/TARE/Home.aspx/Error" in req.url:
-        raise Exception("TARE Server had an error for link: %s" % link)
+    try:
+        if "/Application/TARE/Home.aspx/Error" in req.url:
+            raise Exception("TARE Server had an error for link: %s" % link)
+        elif link != req.url:
+            raise Exception("TARE redirected away from the url %s" % link)
+    except Exception, e:
+        log.debug("%s" % e)
+
     html_data = req.text
     souped = BeautifulSoup(html_data, 'lxml')
 
@@ -150,6 +156,7 @@ def gather_profile_details_for(link, session, base_url):
     region = divs[3].text.strip()
     sibling_group.update_field("Case_Number__c", tare_id)
     fields.remove("Case_Number__c")
+    sibling_group.update_field("Children_s_Webpage__c", link)
 
     for field in fields:
         selector = CHILD_SELECTORS.get(field)

@@ -104,9 +104,9 @@ class DBPlugin(Interface):
         same name as the plugin.
     """)
 
-    def add_child(child):
+    def add_or_update_child(child):
         """
-        Add a child object to the database.
+        Add or update a child object to/in the database.
 
         @type child: Child
         @param child: Child object to add to the database
@@ -115,7 +115,7 @@ class DBPlugin(Interface):
         @returns: id of added child
         """
 
-    def add_sibling_group(sgroup):
+    def add_or_update_sibling_group(sgroup):
         """
         Add a sibling group object to the database.
 
@@ -153,28 +153,17 @@ class DBPlugin(Interface):
         @returns: Contact ID
         """
 
-    def find_similar_contact(contact):
+    def get_contact(contact, create=False):
         """
         Lookup a contact with similar data to the contact parameter.
 
         @type contact: Contact
         @param contact: Contact which to find similarities of.
 
-        @rtype: list(String)
-        @returns: A list of similar Contacts or an empty list if none
-        """
-
-    def get_contact(contact, create=False):
-        """
-        Retrieve a contact.
-
-        @type contact: Contact
-        @param contact: Contact to Find
-
         @type create: Bool
         @param create: Whether or not to create the contact
         if the 'contact' is not found in the database
 
-        @rtrype: C(int) or None
-        @returns: Contact ID or None if not found and create is False
+        @rtype: list(Contact)
+        @returns: A list of similar Contacts or an empty list if none
         """

@@ -116,20 +116,17 @@ class TareSite(object):
         # To gather all Children and Sibling Groups from TARE,
         # a search of all names is required. So, from aa to zz,
         # all will be searched.
-#        first_name_starts = [
-#            "%s%s" % (x, y)
-#            for x in string.ascii_lowercase for y in string.ascii_lowercase
-#        ]
-        first_name_starts = ['ac']
-        all_children = AllChildren()
+        first_name_starts = [
+            "%s%s" % (x, y)
+            for x in string.ascii_lowercase for y in string.ascii_lowercase
+        ]
+#        first_name_starts = ['aa']
         for fname in first_name_starts:
+            all_children = AllChildren([], [])
             self.log.debug("Searching: %s" % fname)
             results = self.search_profiles(fname)
             self.log.debug("Merging: %s" % fname)
-            all_children.merge(results)
-
-        self.log.debug("Returning all")
-        return all_children
+            return all_children.merge(results)
 
     def search_profiles(self, search="aa"):
         """
@@ -143,7 +140,7 @@ class TareSite(object):
         children and sibling groups found by the search
         """
         # The children and sibling groups to return
-        all_children = AllChildren()
+        all_children = AllChildren([], [])
 
         search_post_url = (
             "%s/Application/TARE/Search.aspx/NonMatchingSearchResults" %
@@ -257,7 +254,7 @@ class TareSite(object):
         #        print("%s" % e)
         #        continue
 
-        all_children = AllChildren()
+        all_children = AllChildren([], [])
         for child in solo_children:
             all_children.add_child(child)
         for group in sibling_children:

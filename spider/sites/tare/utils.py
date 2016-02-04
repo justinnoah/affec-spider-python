@@ -41,11 +41,15 @@ def parse_name(name_copy):
 
     if "," in name_copy:
         _split = name_copy.split(",")
-        info["FirstName"] = _split[1].split(" ")[0]
-        info["LastName"] = _split[0]
+        fname = _split[1].strip()
+        if " " in fname:
+            info["FirstName"] = fname.split(" ")[0].strip()
+        else:
+            info["FirstName"] = _split[1].strip()
+        info["LastName"] = _split[0].strip()
     else:
         _split = name_copy.split(" ")
-        info["FirstName"] = _split[0]
+        info["FirstName"] = _split[0].strip()
         info["LastName"] = " ".join(_split[1:])
 
     return info
