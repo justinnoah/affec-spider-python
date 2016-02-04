@@ -30,14 +30,12 @@ class AllChildren(object):
     for both children and sibling groups.
     """
 
-    # List of Child database objects
-    children = []
-
-    # List of SiblingGroup objects
-    siblings = []
-
     def __init__(self, children=[], siblings=[]):
         """Let's do some type checking upfront to make life a bit easier."""
+        log.debug("Creating new AllChildren instance")
+        log.debug(
+            "SHOULD BE 0: %s and %s" % (len(children), len(siblings))
+        )
         if not ((type(children) == list) and (type(siblings) == list)):
             raise TypeError("children and siblings must be a list")
 
@@ -52,6 +50,11 @@ class AllChildren(object):
         # If types are all good, create an AllChildren object
         self.children = children
         self.siblings = siblings
+
+    def __repr__(self):
+        lc = len(self.get_children())
+        ls = len(self.get_siblings())
+        return "AllChildren: %s children, %s sibling groups" % (lc, ls)
 
     def merge(self, second):
         """
@@ -124,6 +127,15 @@ class AllChildren(object):
     def get_siblings(self):
         return list(self.siblings)
 
+    def is_empty(self):
+        count = len(self.get_children()) + len(self.get_siblings())
+        log.debug("AllChildren is_empty count: %s" % count)
+
+        if not count:
+            return True
+        else:
+            return False
+
 
 class _DBObject(object):
     """Database object."""
@@ -169,7 +181,8 @@ class _DBObject(object):
         @type d: dict
         @param d: new key<->value pairs to update variable_fields with.
         """
-        self._variable_fields.update(d)
+        for k, v in dict(d).items():
+            self.update_field(k, v)
 
     def get_field(self, key):
         """
@@ -193,7 +206,12 @@ class _DBObject(object):
         @rtrype: dict
         @returns: a complete Child object as a dict.
         """
-        return dict(self._constant_fields.update(self._variable_fields))
+        data = self._constant_fields
+        data.update(self._variable_fields)
+        if "Id" in data.keys():
+            del data["Id"]
+
+        return data
 
     def add_attachment(self, attachment):
         """
@@ -214,7 +232,7 @@ class _DBObject(object):
 
         self._attachments.append(attachment)
 
-    def __str__(self):
+    def __repr__(self):
         return "%s: %s" % (type(self), self.get_field('Name'))
 
 
@@ -242,19 +260,21 @@ class Child(_DBObject):
             # Child is Listed On Public Website - True
             "Adoption_Recruitment__c": True,
             # Public Web Adoption Recruitment Date
-            "Web_Adoption_Recruitment_Date__c": "%s" % date.today(),
+            "Web_Adoption_Recruitment_Date__c": (
+                "%s" % date.today().isoformat()
+            ),
             # Data Base Listing-Private
-            "Northwest_HG_Private_Listing_Date__c": "%s" % date.today(),
+            "Northwest_HG_Private_Listing_Date__c": (
+                "%s" % date.today().isoformat()
+            ),
             # Data Base Listing-Private
             "Northwest_HG__c": True,
             # AFFEC Web Site
             "Web__c": True,
             # AFFEC Web (Posted To)
-            "Web_Date__c": "%s" % date.today(),
-            # AFFEC Web (Removed From)
-            "Web_End_Date__c": None,
+            "Web_Date__c": "%s" % date.today().isoformat(),
             # Action Needed Date
-            "Action_Needed_Date__c": "%s" % date.today(),
+            "Action_Needed_Date__c": "%s" % date.today().isoformat(),
         }
 
         # Variable
@@ -262,7 +282,7 @@ class Child(_DBObject):
             # Child's First Name
             "Name": "",
             # Child Bulletin Date
-            "Child_Bulletin_Date__c": "",
+            "Child_Bulletin_Date__c": "%s" % date.today().isoformat(),
             # Child's State
             "Child_s_State__c": "TX",
             # Legal Status - If Possible
@@ -288,8 +308,12 @@ class Child(_DBObject):
 
         super(Child, self).__init__(name, constants, variables)
 
-    def __str__(self):
-        return "Child: %s" % self._variable_fields["Name"]
+    def __repr__(self):
+        return "%s: %s - %s" % (
+            type(self),
+            self.get_field("Name"),
+            self.get_field("Link_to_Child_s_Page__c"),
+        )
 
 
 class SiblingGroup(_DBObject):
@@ -308,11 +332,13 @@ class SiblingGroup(_DBObject):
             # Same as only child
             "Recruitment_Status__c": 'Pre-Recruitment',
             # Data Base Listing - Private (date)
-            "Northwest_HG_Private_Listing_Date__c": '%s' % date.today(),
+            "Northwest_HG_Private_Listing_Date__c": (
+                "%s" % date.today().isoformat()
+            ),
             # Data Base Listing - Private (checkmark)
             "Northwest_HG__c": True,
             # Last update
-            "Date_of_Last_Update__c": '%s' % date.today(),
+            "Date_of_Last_Update__c": '%s' % date.today().isoformat(),
             # Recruitment Update
             "Recruitment_Update__c": (
                 "%s - Copied in by web spider from TARE" %
@@ -328,8 +354,8 @@ class SiblingGroup(_DBObject):
             "Name": '',
             # Legal status if possible
             "Legal_Status2__c": '',
-            # generated with positional B-H suffix - generated
-            "Bulletin_Number__c": '',
+            # generated with positional B-H suffichildren - generated
+            # "Bulletin_Number__c": '',
             # Children's names
             "Child_1_First_Name__c": '',
             "Child_2_First_Name__c": '',
@@ -347,6 +373,7 @@ class SiblingGroup(_DBObject):
             "Caseworker__c": '',
             "Children_s_Bio__c": '',
             "Caseworker_Placement_Notes__c": '',
+            'Children_s_Webpage__c': '',
         }
 
         super(SiblingGroup, self).__init__(name, constants, variables)
@@ -361,6 +388,13 @@ class SiblingGroup(_DBObject):
 
     def get_children(self):
         return list(self.children)
+
+    def __repr__(self):
+        return "%s: %s - %s" % (
+            type(self),
+            self.get_field("Name"),
+            self.get_field("Children_s_Webpage__c")
+        )
 
 
 class Contact(_DBObject):
@@ -379,7 +413,7 @@ class Contact(_DBObject):
 
         constants = {
             "AccountId": "0014B0000048cGK",
-            "Business_Name__c": "Texas DFPS",
+            "Business_Name__c": "Techildrenas DFPS",
             "Last_Action__c":
                 "%s entered by TARE spider." % datetime.now().isoformat(' ')
         }
@@ -405,6 +439,15 @@ class Contact(_DBObject):
             self._variable_fields['FirstName'],
             self._variable_fields['LastName']
         )
+
+    def __repr__(self):
+        ret_list = []
+        for k, v in self.as_dict().iteritems():
+            ret_list.append("%s: %s" % (k, v))
+
+        ret_str = "Contact: %s" % ", ".join(ret_list)
+
+        return ret_str
 
 
 class Attachment(_DBObject):

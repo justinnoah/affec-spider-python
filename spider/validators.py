@@ -54,6 +54,9 @@ def valid_phone(number):
 def valid_address(addr):
     """Address validator/parser."""
     # Sanitize-ish
+    multispace = re.compile("\s+")
+    addr = multispace.sub(" ", addr)
+
     addr_split = [
         x for x in addr.title().split(" ") if x not in ["", '', None]
     ]

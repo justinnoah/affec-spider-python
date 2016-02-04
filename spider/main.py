@@ -15,6 +15,8 @@
 """Main module to get things fired up and running."""
 
 import os
+from itertools import imap
+import string
 import sys
 
 from configobj import ConfigObj, ConfigObjError
@@ -72,18 +74,21 @@ def import_data(plugins):
         'database': DBPlugin
     }
     """
-    # All the children and siblings groups to be imported
-    all_children = AllChildren()
-
     log.info("Begin parsing / importing data from sites.")
     # For each site listed in the config
     for site in plugins['sites']:
         # grab all chilrden and sibling groups
-        all_children.merge(site.get_all())
+        first_name_starts = [
+            "%s%s" % (x, y)
+            for x in string.ascii_lowercase for y in string.ascii_lowercase
+        ]
 
-    log.info("db plugin: add_allchildren.")
-    # and import the data
-    plugins['database'].add_all(all_children)
+        for ac in imap(site.search_profiles, first_name_starts):
+            log.debug(unicode(ac))
+
+            log.info("db plugin: add_allchildren.")
+            # and import the data
+            plugins["database"].add_all(ac)
 
 
 def main(config_path=None):

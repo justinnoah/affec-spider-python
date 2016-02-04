@@ -14,6 +14,8 @@
 
 """Salesforce plugin for AFFEC Spider."""
 
+import re
+
 from simple_salesforce import Salesforce as sfdb
 from twisted.logger import Logger
 from zope.interface import implements
@@ -91,29 +93,64 @@ class Salesforce(object):
         """
         return self.sf.query(query)
 
-    def _results_to_childs(self, res):
+    def _results_to_childs(self, results):
         """
         Convert salesforce Child results into a list of Child objects.
 
-        @type res: OrderedDict
-        @param res: salesforce returned Child
+        @type res: [OrderedDict]
+        @param res: salesforce returned list of Children__c OrderedDicts
 
-        @rtype: Child
-        @return: salesforce results as a list of Child objects
+        @rtype: [Child]
+        @return: salesforce [Children__c] as a [Child]
         """
-        return []
+        children = []
 
-    def _results_to_sibling_groups(self, res):
+        for res in results:
+            print("\n\n\n%s\n\n\n" % res)
+            child = Child()
+            child.update_fields(res)
+            children.append(child)
+
+        return children
+
+    def _results_to_sibling_groups(self, results):
         """
         Convert salesforce Sibling results into a list of SiblingGroup objects.
 
-        @type res: OrderedDict
-        @param res: salesforce returned SiblingGroup
+        @type res: [OrderedDict]
+        @param res: salesforce returned list of Sibling_Group__c OrderedDicts
 
-        @rtype: [SiblingGroup]
-        @return: salesforce results as a list of SiblingGroup objects
+        @rtype: SiblingGroup
+        @return: salesforce [Sibling_Group__c] as a [SiblingGroup]
         """
-        return []
+        sgroups = []
+
+        for res in results:
+            sgroup = SiblingGroup()
+            sgroup.update_fields(res)
+            sgroups.append(sgroup)
+
+        return sgroups
+
+    def _results_to_contacts(self, results):
+        """
+        Convert salesforce Sibling results into a list of SiblingGroup objects.
+
+        @type res: [OrderedDict]
+        @param res: salesforce returned list of Sibling_Group__c OrderedDicts
+
+        @rtype: SiblingGroup
+        @return: salesforce [Sibling_Group__c] as a [SiblingGroup]
+        """
+        contacts = []
+
+        for res in results:
+            self.log.debug("SF CONTACT: %s" % unicode(res))
+            contact = Contact()
+            contact.update_fields(res)
+            contacts.append(contact)
+
+        return contacts
 
     def add_all(self, all_of_them):
         """Import an AllChildren object into the database."""
@@ -128,19 +165,31 @@ class Salesforce(object):
         for child in children:
             # We do not save the return value as it
             # is not needed for anything here.
-            self.add_child(child)
+            self.add_or_update_child(child)
 
         # Finish with SiblingGroups
         sgroups = all_of_them.get_siblings()
         for sgroup in sgroups:
             # We do not save the return value as it
             # is not needed for anything here.
-            self.add_sibling_group(sgroup)
+            self.add_or_update_sibling_group(sgroup)
 
     def find_by_case_number(self, case_number, t=None):
-        """Find either Children or SiblingGroups with `case_number`."""
+        """
+        Find either Children or SiblingGroups with `case_number`.
+
+        @type case_number: String
+        @param case_number: Case Number to search by
+
+        @type t: _DBObject
+        @param t: Either Child or SiblingGroup object. None can be used for
+        uncertain cases and may return both
+
+        @rtype: AllChildren
+        @return: Object containing results from the case number query
+        """
         self.log.debug(
-            "Finding Children__c with case_number: %s" % case_number
+            "Querying case_number: %s" % case_number
         )
 
         # The search criteria is only a case number
@@ -150,37 +199,38 @@ class Salesforce(object):
 
         # We are returning an AllChildren type since this method can
         # be used for either Children__c or Sibling_Group__c
-        results = AllChildren()
+        existing_results = AllChildren([], [])
 
         # Type not specified, return both
         if not t:
             children = self.get_children_by(criteria)
             siblings = self.get_sibling_group_by(criteria)
             for child in self._results_to_childs(children):
-                results.add_child(child)
+                existing_results.add_child(child)
             for sibling in self._results_to_sibling_groups(siblings):
-                results.add_sibling_group(sibling)
+                existing_results.add_or_update_sibling_group(sibling)
         # Return results from Children__c
-        elif type(t) is Child:
+        elif t == Child:
             children = self.get_children_by(criteria)
             for child in self._results_to_childs(children):
-                results.add_child(child)
+                existing_results.add_child(child)
         # Return results from Sibling_Group__c
-        elif type(t) is SiblingGroup:
+        elif t == SiblingGroup:
             siblings = self.get_sibling_group_by(criteria)
             for sibling in self._results_to_sibling_groups(siblings):
-                results.add_sibling_group(sibling)
+                existing_results.add_sibling_group(sibling)
         # Uh-oh, not good.
         else:
             raise TypeError(
                 "find_by_case_number requires "
-                "a type of None, Child, or SiblingGroup"
+                "a type of None, Child, or SiblingGroup.\nReceived: %s"
+                % t
             )
 
         # Returning an AllChildren object with Childs SiblingGroups or both
-        return results
+        return existing_results
 
-    def add_child(self, child):
+    def add_or_update_child(self, child):
         """
         Add a Child object to the database.
 
@@ -192,18 +242,75 @@ class Salesforce(object):
                 "objects to the database as Child objects" % type(child)
             )
 
+        self.log.debug("Importing Child: %s/%s - %s" % (
+            child.get_field("Name"),
+            child.get_field("Case_Number__c"),
+            child.get_field("Link_to_Child_s_Page__c")
+        ))
+
+        # Check for existing with TareId
+        existing_tare_id_results = self.find_by_case_number(
+            child.get_field("Case_Number__c"),
+            Child
+        )
+
+        # Are we updating or creating?
+        if not existing_tare_id_results.is_empty():
+            self.log.debug("TARE Id exists in the database already, updating.")
+            existing_child = existing_tare_id_results.get_children()[0]
+            self.log.debug(
+                "Updating child with Id: %s" % existing_child.get_field("Id")
+            )
+            child.update_field("Id", existing_child.get_field("Id"))
+
         # Check for a contact and add it first
         contact = child.get_field("Case_Worker_Contact__c")
         if type(contact) == Contact:
-            returned = self.find_similar_contact(contact, create=True)
+            self.log.debug("Contact: %s" % contact)
+            returned = self.get_contact(contact, create=True)[0]
+            if type(returned) == list:
+                returned = returned[0]
+            self.log.debug("Returned Contact: %s" % returned)
             child.update_field(
                 'Case_Worker_Contact__c',
-                returned.get('Id')
+                returned.get_field("Id"),
             )
         else:
             child.update_field('Case_Worker_Contact__c', '')
 
-        return self.sf.Children__c.create(child.as_dict())
+        # Do our best to turn the Nationality into picklist options
+        nationalities = child.get_field("Child_s_Nationality__c")
+        if nationalities:
+            picklist = []
+            word = re.compile("\w+")
+            for nationality in nationalities:
+                word_match = word.match(nationality)
+                first_word = (
+                    "Unknown" if not word_match
+                    else word_match.group()
+                )
+                for pick in self.nationalities:
+                    if first_word in pick:
+                        picklist.append(pick)
+            if not picklist:
+                picklist.append("Unknown")
+
+            child.update_field('Child_s_Nationality__c', ";".join(picklist))
+
+        child_id = child.get_field("Id")
+        if child_id:
+            x = self.sf.Children__c.update(
+                child.get_field("Id"), child.as_dict()
+            )
+            import pprint
+            pprint.pprint("Returning an update:\n\n%s\n\n" % x)
+        else:
+            x = self.sf.Children__c.create(child.as_dict())
+            import pprint
+            pprint.pprint("Returning an added obj:\n\n%s\n\n" % x)
+            child.update_field("Id", x.get("id"))
+
+        return child
 
     def get_children_by(self, search_criteria, return_fields=[]):
         """
@@ -226,7 +333,7 @@ class Salesforce(object):
         )
 
         # select fiesds, we always return at least Id
-        s_fields = ['Id']
+        s_fields = ["Id"]
         for field in return_fields:
             s_fields.append(field)
 
@@ -235,31 +342,32 @@ class Salesforce(object):
 
         # Parse the dict indo a where clause
         w_fields = []
-        for k, v in search_criteria:
+        for k, v in search_criteria.items():
             w_fields.append("%s = '%s'" % (k, v))
 
         # Join the list of w_filds into a string separated by AND
         where_fields = " AND ".join(w_fields)
 
         # Use the internal query method to query
-        results = self._query(
-            query_string % {
-                'select_fields': select_fields,
-                'where_fields': where_fields
-            }
-        )
+        final_query = query_string % {
+            'select_fields': select_fields,
+            'where_fields': where_fields
+        }
 
-        # Return results as a list
-        if results:
-            return [results] if not type(results) == list else results
-        else:
-            return []
+        results = self._query(final_query)["records"]
+
+        self.log.debug("\nQuery: %s\n\nResults: %s" % (
+            unicode(final_query),
+            unicode(results)
+        ))
+
+        return results
 
     def get_children_count(self):
         """Return the number of Child objects in the database."""
         raise DoesNotImplement("Skeleton only.")
 
-    def add_sibling_group(self, sgroup):
+    def add_or_update_sibling_group(self, sgroup):
         """
         Add a SiblingGroup object to the database.
 
@@ -276,18 +384,40 @@ class Salesforce(object):
         # Given a sibling group, the children should be added first
         children = sgroup.get_children()
         for num, child in enumerate(children):
-            added_child = self.add_child(child)
+            added_child = self.add_or_update_child(child)
             sgroup.update_field(
                 # enumerate starts at 0, the references start at 1
-                reference_str % num + 1,
-                added_child.get("Id")
+                reference_str % int(int(num) + 1),
+                added_child.get_field("Id")
             )
 
         contact = sgroup.get_field("Caseworker__c")
-        added_contact = self.find_similar_contact(contact, create=True)
+        added_contact = self.get_contact(contact, create=True)[0]
         sgroup.update_field('Caseworker__c', added_contact.get_field("Id"))
 
-        return self.sf.Sibling_Group__c.create(sgroup.as_dict())
+        # Check for existing with TareId
+        existing_tare_id_results = self.find_by_case_number(
+            sgroup.get_field("Case_Number__c"),
+            SiblingGroup
+        )
+
+        # Are we updating or creating?
+        if not existing_tare_id_results.is_empty():
+            self.log.debug("TARE Id exists in the database already, updating.")
+            existing_group = existing_tare_id_results.get_siblings()[0]
+            gr_id = existing_group.get_field("Id")
+            self.log.debug("Updating sibling group with Id: %s" % gr_id)
+            sgroup.update_field("Id", gr_id)
+
+        if sgroup.get_field("Id"):
+            self.sf.Sibling_Group__c.update(
+                child.get_field("Id"), child.as_dict()
+            )
+        else:
+            x = self.sf.Children__c.create(child.as_dict())
+            child.update_field("Id", x.get("id"))
+
+        return sgroup
 
     def get_sibling_group_by(self, search_criteria):
         """
@@ -305,7 +435,7 @@ class Salesforce(object):
 
         # Parse the dict indo a where clause
         fields = []
-        for k, v in search_criteria:
+        for k, v in search_criteria.items():
             fields.append("%s = '%s'" % (k, v))
 
         where_fields = " OR ".join(fields)
@@ -332,13 +462,15 @@ class Salesforce(object):
                 "add_contact requires a Contact object as an argument"
             )
         self.log.debug("add_contact: %s" % contact.name())
-        self.sf.Contact.create(contact.as_dict())
+        returned = self.sf.Contact.create(contact.as_dict()).get("id")
+        contact.update_field("Id", returned)
+        return contact
 
-    def find_similar_contact(self, contact, create=False):
+    def get_contact(self, contact, create=False):
         """Find and return a list of similar contacts, create if missing."""
         query = """
             SELECT Id,%(fields)s FROM Contact
-            WHERE (%(name)s) OR (%(mailing)s)
+            WHERE (%(name)s) AND (%(mailing)s)
         """
 
         # Fields to return from the query along with the Id
@@ -350,7 +482,7 @@ class Salesforce(object):
             'FirstName': [],
             'LastName': '',
             'Phone': '',
-            'Email': '',
+            # 'Email': '',
         }
 
         # Fields for comparison
@@ -364,10 +496,11 @@ class Salesforce(object):
 
         for field in fields:
             data = contact.get_field(field)
+            self.log.debug("Field Data: %s" % data)
             # Handle first names
             if field == 'FirstName':
                 # First Name to search
-                fname = data
+                fname = data.strip()
                 if fname.startswith("bob"):
                     fields["FirstName"].append('bob')
                     fields["FirstName"].append('r')
@@ -398,11 +531,11 @@ class Salesforce(object):
 
         select_fields = ",".join(fields.keys())
         fname = where_fields["FirstName"]
-        del where_fields["FirstName"]
+
         mailing_list = []
-        for k, v in where_fields:
-            if v:
-                mailing_list.append("%s = '%s'" % (k, v))
+        for k, v in where_fields.iteritems():
+            if "Mailing" in k:
+                mailing_list.append(v)
 
         final_query = query % {
             'fields': select_fields,
@@ -410,16 +543,18 @@ class Salesforce(object):
             'mailing': " AND ".join(mailing_list)
         }
 
-        self.log.debug("QUERY:\n%s\n" % final_query)
-        results = self._query(final_query)
+        self.log.debug("CONTACT QUERY:\n%s\n" % final_query)
+        r = self._query(final_query).get("records")
+        self.log.debug("QUERY RESULTS:\n%s\n" % unicode(r))
+        results = self._results_to_contacts(r)
 
         # FIXME: Need to convert results to proper data types
-        if not results.get('totalSize') and create:
+        if (not results) and create:
+            self.log.debug("Creating contact")
             results = self.add_contact(contact)
 
         # FIXME: Only handling the one most likely. This Needs to change.
-        return [results] if not type(results) == list else results[0]
-
-    def get_contact(self, contact, create=False):
-        """Search for `contact` in the database. Create if `create`."""
-        raise DoesNotImplement("Skeleton only.")
+        if results:
+            return [results] if not type(results) == list else results
+        else:
+            return []

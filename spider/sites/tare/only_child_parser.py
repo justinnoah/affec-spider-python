@@ -78,11 +78,13 @@ def parse_child_info(link, soup):
     child_fields = list(child_info.get_variable_fields())
 
     # Handle Special Cases
-    child_info.update_fields({
-        "Link_to_Child_s_Page__c": link
-    })
-
     try:
+        child_info.update_fields({
+            "Link_to_Child_s_Page__c": link,
+            'Case_Number__c': soup.select(
+                CHILD_SELECTORS['Case_Number__c']
+            )[0].text.strip(),
+        })
         child_fields.remove('Link_to_Child_s_Page__c')
     except ValueError:
         pass
@@ -97,7 +99,7 @@ def parse_child_info(link, soup):
         "Primary Language": "Child_s_Primary_Language__c",
     }
 
-    def grab_data(current, itr):
+    def grab_child_data(current, itr):
         field = current.text.strip()
 
         # Handle special parsing requirements
@@ -125,9 +127,9 @@ def parse_child_info(link, soup):
         # Given sub-fields, lets check them
         if len(rabbit_hole):
             for rabbit_itr in fs:
-                grab_data(rabbit_itr, fs)
+                grab_child_data(rabbit_itr, fs)
         else:
-            grab_data(field, fields)
+            grab_child_data(field, fields)
 
     # Return Data
     return child_info
@@ -144,21 +146,32 @@ def parse_contact_info(soup):
     @return: Contact object filled in with data from the soup.
     """
     contact_info = Contact()
-    contact_fields = list(contact_info.get_variable_fields())
 
-    cw_soup = iter(soup.select("fieldset > div"))
+    tare_provided_fields = {
+        "Name": "",
+        "Address": "",
+        "Phone Number": "Phone",
+        "Email Address": "Email",
+    }
 
-    for field in cw_soup:
-        info = parse_name(next(cw_soup).text.strip())
-        if field.text == "Name":
-            contact_info.update_fields(parse_name(info))
+    def grab_contact_data(current, itr):
+        field = current.text.strip()
+
+        # Handle special parsing requirements
+        if field == "Name":
+            contact_info.update_fields(
+                parse_name(next(itr).text.strip())
+            )
         elif field == "Phone":
-            contact_info.update_field("Phone", validators["phone"](info))
+            contact_info.update_field(
+                tare_provided_fields[field],
+                validators["phone"](next(iter).text.strip())
+            )
         elif field == "Address":
             cleaned_re = re.compile("\s+")
-            info = cleaned_re.sub(" ", info)
-            address = validators["address"](info.strip())
+            info = cleaned_re.sub(" ", next(itr).text.strip())
             try:
+                address = validators["address"](info.strip())
                 str_types = [str, unicode]
                 address_fields = {
                     "MailingStreet": (
@@ -185,8 +198,26 @@ def parse_contact_info(soup):
                 contact_info.update_fields(address_fields)
             except:
                 pass
-        elif "Email Address" in field.text:
-            contact_info.update_field("Email", info)
+        elif field in tare_provided_fields.keys():
+            value = next(itr).text.strip()
+            contact_info.update_field(tare_provided_fields[field], value)
+        # Short circuit if nothing relavent found
+        else:
+            return None
+
+    cw_soup = iter(soup.select("fieldset > div"))
+
+    for field in cw_soup:
+        # Only one div should be proccessed,
+        # if multiple exist, let's break it down
+        rabbit_hole = field.select("div")
+        fs = iter(rabbit_hole)
+        # Given sub-fields, lets check them
+        if len(rabbit_hole):
+            for rabbit_itr in fs:
+                grab_contact_data(rabbit_itr, fs)
+        else:
+            grab_contact_data(field, cw_soup)
 
     return contact_info
 
