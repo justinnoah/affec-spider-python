@@ -411,11 +411,11 @@ class Salesforce(object):
 
         if sgroup.get_field("Id"):
             self.sf.Sibling_Group__c.update(
-                child.get_field("Id"), child.as_dict()
+                sgroup.get_field("Id"), sgroup.as_dict()
             )
         else:
-            x = self.sf.Children__c.create(child.as_dict())
-            child.update_field("Id", x.get("id"))
+            x = self.sf.Sibling_Group__c.create(sgroup.as_dict())
+            sgroup.update_field("Id", x.get("id"))
 
         return sgroup
 

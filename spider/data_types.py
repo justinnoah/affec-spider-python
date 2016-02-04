@@ -107,6 +107,7 @@ class AllChildren(object):
         self.children.append(child)
 
     def get_children(self):
+        """Return a deep copy of the list of children."""
         return list(self.children)
 
     def add_sibling_group(self, group):
@@ -125,11 +126,12 @@ class AllChildren(object):
         self.siblings.append(group)
 
     def get_siblings(self):
+        """Return a deep copy of the list of sibling groups."""
         return list(self.siblings)
 
     def is_empty(self):
+        """Checks whether self contains any Child or SiblingGroup objects."""
         count = len(self.get_children()) + len(self.get_siblings())
-        log.debug("AllChildren is_empty count: %s" % count)
 
         if not count:
             return True
@@ -387,6 +389,7 @@ class SiblingGroup(_DBObject):
             )
 
     def get_children(self):
+        """Return a deep copy of the list of children in the SiblingGroup."""
         return list(self.children)
 
     def __repr__(self):
