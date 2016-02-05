@@ -24,6 +24,7 @@ from zope.interface import implements
 from zope.interface.exceptions import DoesNotImplement
 
 from data_types import AllChildren
+from helpers import return_type
 from iplugin import SitePlugin
 from . import only_child_parser, sibling_group_parser
 
@@ -105,6 +106,7 @@ class TareSite(object):
                 )
         return config
 
+    @return_type(AllChildren)
     def get_all(self):
         """
         Return AllChildren on the tare website.
@@ -121,13 +123,15 @@ class TareSite(object):
             for x in string.ascii_lowercase for y in string.ascii_lowercase
         ]
 #        first_name_starts = ['aa']
+        all_children = AllChildren([], [])
         for fname in first_name_starts:
-            all_children = AllChildren([], [])
             self.log.debug("Searching: %s" % fname)
             results = self.search_profiles(fname)
             self.log.debug("Merging: %s" % fname)
-            return all_children.merge(results)
 
+        return all_children.merge(results)
+
+    @return_type(AllChildren)
     def search_profiles(self, search="aa"):
         """
         TARE decided to revamp their search page.
@@ -176,24 +180,38 @@ class TareSite(object):
 
             # If the link contains Child.aspx, it's an only child
             if "Child.aspx" in link:
-                child = only_child_parser.gather_profile_details_for(
-                    link, self.session, self.base_url
-                )
-                all_children.add_child(child)
+                try:
+                    child = only_child_parser.gather_profile_details_for(
+                        link, self.session, self.base_url
+                    )
+                    all_children.add_child(child)
+                except ValueError, e:
+                    self.log.debug("%s" % e)
+                    continue
+
             # If the link contains Group.aspx, it's a sibling group
             elif "Group.aspx" in link:
-                group = sibling_group_parser.gather_profile_details_for(
-                    link, self.session, self.base_url
-                )
-                self.log.debug("group: %s" % group)
-                all_children.add_sibling_group(group)
+                try:
+                    group = sibling_group_parser.gather_profile_details_for(
+                        link, self.session, self.base_url
+                    )
+                    all_children.add_sibling_group(group)
+                except ValueError, e:
+                    self.log.debug("%s" % e)
+                    continue
 
         # Returned the parsed data
         self.log.debug("Returning results for: %s" % search)
         return all_children
 
+    @return_type(AllChildren)
     def search_profiles_old_template(self, search="ad"):
-        """Search TARE for children with names starting with `search`."""
+        """
+        Search TARE for children with names starting with `search`.
+
+        This was based on an older template of TARE. Kept arround in
+        case the go back to it, but as of now, this method is unused.
+        """
         post_url = (
             "%s/Application/TARE/Search.aspx/NonMatchingSearchResults" %
             self.base_url
@@ -210,7 +228,7 @@ class TareSite(object):
         except HTTPError, e:
             self.log.error("Failed to search for: %s" % search)
             self.log.failure(e)
-            return []
+            return AllChildren()
 
         html = req.text
         link_objs = self.parse_search_results(html)
@@ -226,14 +244,14 @@ class TareSite(object):
         solo_children = []
         self.log.debug("Begin Scraping of only child profiles")
         for link in solo_links:
-            child = only_child_parser.gather_profile_details_for(
-                link, self.session, self.base_url
-            )
-            solo_children.append(child)
-        #    except Exception, e:
-        #        print("An issue occured with: %s" % link)
-        #        print("%s" % e)
-        #        continue
+            try:
+                child = only_child_parser.gather_profile_details_for(
+                    link, self.session, self.base_url
+                )
+                solo_children.append(child)
+            except ValueError, e:
+                self.log.debug("%s" % e)
+                continue
 
         sibling_links = []
         for siblings in link_objs.get('siblings'):
@@ -245,14 +263,14 @@ class TareSite(object):
         self.log.info("Found %s 'sibling groups'" % len(sibling_links))
         sibling_children = []
         for link in sibling_links:
-            siblings = sibling_group_parser.gather_profile_details_for(
-                link, self.session, self.base_url
-            )
-            sibling_children.append(siblings)
-        #    except Exception, e:
-        #        print("An issue occured with: %s" % link)
-        #        print("%s" % e)
-        #        continue
+            try:
+                siblings = sibling_group_parser.gather_profile_details_for(
+                    link, self.session, self.base_url
+                )
+                sibling_children.append(siblings)
+            except ValueError, e:
+                self.log.debug("%s" % e)
+                continue
 
         all_children = AllChildren([], [])
         for child in solo_children:
@@ -289,10 +307,10 @@ class TareSite(object):
 
         return children_tags
 
-    def get_child_by_id(self, cid):
+    def get_child_by_id(self, state_id):
         """Tare definition of SitePlugin method."""
         raise DoesNotImplement("Skeleton only.")
 
-    def get_sibling_group_by_id(self, sgid):
+    def get_sibling_group_by_id(self, state_id):
         """Tare definition of SitePlugin method."""
         raise DoesNotImplement("Skeleton only.")

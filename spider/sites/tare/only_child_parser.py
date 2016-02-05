@@ -20,6 +20,7 @@ from bs4 import BeautifulSoup
 from twisted.logger import Logger
 
 from data_types import Child, Contact
+from helpers import return_type
 from utils import (
     create_attachment, get_birthdate, get_pictures_encoded, parse_name
 )
@@ -64,6 +65,7 @@ ATTACHMENT_SELECTORS = {
 }
 
 
+@return_type(Child)
 def parse_child_info(link, soup):
     """
     Parse Child data from a swirl of soup.
@@ -135,6 +137,7 @@ def parse_child_info(link, soup):
     return child_info
 
 
+@return_type(Contact)
 def parse_contact_info(soup):
     """
     Parse Contact data from a swirl of soup.
@@ -201,9 +204,7 @@ def parse_contact_info(soup):
         elif field in tare_provided_fields.keys():
             value = next(itr).text.strip()
             contact_info.update_field(tare_provided_fields[field], value)
-        # Short circuit if nothing relavent found
-        else:
-            return None
+        # End of grab_contact_data
 
     cw_soup = iter(soup.select("fieldset > div"))
 
@@ -224,13 +225,19 @@ def parse_contact_info(soup):
 
 def parse_attachments(child, session, souped, base_url):
     """
-    Parse Contact data from a swirl of soup.
+    Parse attachments and add them to the child object.
 
-    @type soup: BeautifulSoup data
+    @type child: Child
+    @param child: Child to have attachments / pictures added to.
+
+    @type session: requests session
+    @param session: The "browser" session that has us logged into TARE.
+
+    @type souped: BeautifulSoup data
     @param soup: Chunk of a webpage containing the contact info.
 
-    @rtype: Contact
-    @return: Contact object filled in with data from the soup.
+    @type base_url: String
+    @param base_url: The beginning of all TARE urls.
     """
     # Get the profile picture attachment
     profile_image_data = get_pictures_encoded(
@@ -262,6 +269,7 @@ def parse_attachments(child, session, souped, base_url):
         child.add_attachment((create_attachment(img.get("full"), name)))
 
 
+@return_type(Child)
 def gather_profile_details_for(link, session, base_url):
     """
     Given a TARE URL, pull the following data about a child.
@@ -274,7 +282,9 @@ def gather_profile_details_for(link, session, base_url):
     # "Import" the html into BeautifulSoup for easy traversal
     req = session.get(link)
     if "/Application/TARE/Home.aspx/Error" in req.url:
-        raise Exception("TARE Server had an error for link: %s" % link)
+        raise ValueError("TARE Server had an error for link: %s" % link)
+    elif "/Application/TARE/Home.aspx/Default" in req.url:
+        raise ValueError("TARE redirected away from the url %s" % link)
 
     # HTML data from the request
     html_data = req.text

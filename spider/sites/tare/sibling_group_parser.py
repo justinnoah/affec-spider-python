@@ -17,7 +17,8 @@
 from bs4 import BeautifulSoup
 from twisted.logger import Logger
 
-from data_types import Contact, SiblingGroup
+from data_types import Child, Contact, SiblingGroup
+from helpers import return_type
 from only_child_parser import gather_profile_details_for as gather_child
 from utils import parse_name
 from validators import valid_email, valid_phone
@@ -55,6 +56,7 @@ CONTACT_SELECTORS = {
 }
 
 
+@return_type(list)
 def parse_children_in_group(soup, session, base_url):
     """Parse each child's name out of the sibling group."""
     children = []
@@ -74,6 +76,7 @@ def parse_children_in_group(soup, session, base_url):
     return children
 
 
+@return_type(dict)
 def parse_case_worker_details(souped):
         """
         Using the CASE_WORKER_SELECTOR grab essential data.
@@ -107,6 +110,7 @@ def parse_case_worker_details(souped):
         return cw_data
 
 
+@return_type(SiblingGroup)
 def gather_profile_details_for(link, session, base_url):
     """
     Given a TARE URL, pull the following data about a child.
@@ -122,13 +126,10 @@ def gather_profile_details_for(link, session, base_url):
 
     # "Import" the html into BeautifulSoup for easy traversal
     req = session.get(link)
-    try:
-        if "/Application/TARE/Home.aspx/Error" in req.url:
-            raise Exception("TARE Server had an error for link: %s" % link)
-        elif link != req.url:
-            raise Exception("TARE redirected away from the url %s" % link)
-    except Exception, e:
-        log.debug("%s" % e)
+    if "/Application/TARE/Home.aspx/Error" in req.url:
+        raise ValueError("TARE Server had an error for link: %s" % link)
+    elif "/Application/TARE/Home.aspx/Default" in req.url:
+        raise ValueError("TARE redirected away from the url %s" % link)
 
     html_data = req.text
     souped = BeautifulSoup(html_data, 'lxml')
