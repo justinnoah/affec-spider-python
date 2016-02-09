@@ -312,7 +312,8 @@ class Salesforce(object):
         # Add attachments and give the attachment's the Child object's ID
         attachments = list(child.get_attachments())
         for attachment in attachments:
-            self.add_attachment(attachment, child.get_field("Id"))
+            a = self.add_attachment(attachment, child.get_field("Id"))
+            self.log.debug("Adding attachment: %s" % a)
 
         return child
 
@@ -438,6 +439,12 @@ class Salesforce(object):
         else:
             x = self.sf.Sibling_Group__c.create(sgroup.as_dict())
             sgroup.update_field("Id", x.get("id"))
+
+        # Add attachments and give the attachment's the Child object's ID
+        attachments = list(sgroup.get_attachments())
+        for attachment in attachments:
+            a = self.add_attachment(attachment, sgroup.get_field("Id"))
+            self.log.debug("Adding attachment: %s" % a)
 
         return sgroup
 
