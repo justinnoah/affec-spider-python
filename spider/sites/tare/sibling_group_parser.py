@@ -41,12 +41,12 @@ SGROUP_SELECTORS = {
         "div#pageContent > div > div:nth-of-type(6) > div:nth-of-type(2)"
     ),
     "Children_s_Bio__c": [
-        "> div:nth-of-type(8)",
-        "> div:nth-of-type(9)",
-        "> div:nth-of-type(10)",
-        "> div:nth-of-type(11)",
-        "> div:nth-of-type(12)",
-        "> div:nth-of-type(13)",
+        "div#pageContent > div > div:nth-of-type(8)",
+        "div#pageContent > div > div:nth-of-type(9)",
+        "div#pageContent > div > div:nth-of-type(10)",
+        "div#pageContent > div > div:nth-of-type(11)",
+        "div#pageContent > div > div:nth-of-type(12)",
+        "div#pageContent > div > div:nth-of-type(13)",
     ],
 }
 
