@@ -253,7 +253,11 @@ def parse_attachments(child, session, souped, base_url):
         base_url, False
     )
 
-    log.debug("GRABBED ALL ATTACHMENTS! %s and %s" % (len(profile_image_data), len(other_images)))
+    log.debug(
+        "GRABBED ALL ATTACHMENTS! %s and %s" % (
+            len(profile_image_data), len(other_images)
+        )
+    )
 
     # Create attachments for the profile and thumbnail of the profile
     for img in profile_image_data:

@@ -14,13 +14,15 @@
 
 """Parse sibling group pages on TARE."""
 
+import random
+
 from bs4 import BeautifulSoup
 from twisted.logger import Logger
 
-from data_types import Child, Contact, SiblingGroup
+from data_types import Contact, SiblingGroup
 from helpers import return_type
 from only_child_parser import gather_profile_details_for as gather_child
-from utils import parse_name
+from utils import create_attachment, get_pictures_encoded, parse_name
 from validators import valid_email, valid_phone
 
 log = Logger()
@@ -30,7 +32,7 @@ CASE_WORKER_SELECTOR = "div#pageContent > div > div:nth-of-type(6)"
 
 # These are the magic phrases that get the data from a TARE profile page
 # They also happen to represent some, if not all of the fields to be updated
-CHILD_SELECTORS = {
+SGROUP_SELECTORS = {
     "Name": (
         "div > div:nth-of-type(2) > a"
     ),
@@ -55,6 +57,12 @@ CONTACT_SELECTORS = {
     "Email": "div:nth-of-type(6)",
 }
 
+ATTACHMENT_SELECTORS = {
+    "profile_picture": "div#pageContent > div > div > a > img",
+    "other_pictures": "div.galleryImage > a > img"
+
+}
+
 
 @return_type(list)
 def parse_children_in_group(soup, session, base_url):
@@ -64,7 +72,7 @@ def parse_children_in_group(soup, session, base_url):
     for i, child_link in enumerate(children_to_parse):
         small_soup = BeautifulSoup(str(child_link), "lxml")
         _sub_link = small_soup.select_one(
-            CHILD_SELECTORS.get("Name")
+            SGROUP_SELECTORS.get("Name")
         )
         if _sub_link:
             sub_link = _sub_link.get("href")
@@ -74,6 +82,60 @@ def parse_children_in_group(soup, session, base_url):
             children.append(child)
 
     return children
+
+
+def parse_attachments(sgroup, session, souped, base_url):
+    """
+    Parse attachments and add them to the child object.
+
+    @type sgroup: SiblingGroup
+    @param child: SiblingGroup to have attachments / pictures added to.
+
+    @type session: requests session
+    @param session: The "browser" session that has us logged into TARE.
+
+    @type souped: BeautifulSoup data
+    @param soup: Chunk of a webpage containing the contact info.
+
+    @type base_url: String
+    @param base_url: The beginning of all TARE urls.
+    """
+    # Get the profile picture attachment
+    profile_image_data = get_pictures_encoded(
+        session, souped,
+        ATTACHMENT_SELECTORS.get("profile_picture"),
+        base_url, True
+    )
+
+    # Get other images
+    other_images = get_pictures_encoded(
+        session, souped,
+        ATTACHMENT_SELECTORS.get("other_pictures"),
+        base_url, False
+    )
+
+    log.debug(
+        "GRABBED ALL ATTACHMENTS! %s and %s" % (
+            len(profile_image_data), len(other_images)
+        )
+    )
+
+    # Create attachments for the profile and thumbnail of the profile
+    for img in profile_image_data:
+        for k, v in img.iteritems():
+            name = "-%s-%s.jpg" % (
+                sgroup.get_field("Name"), str(random.randint(100, 999))
+            )
+            sgroup.add_attachment((create_attachment(v, name)))
+
+    # Create attachments of all other images and append a number to the name
+    for i, img in enumerate(other_images):
+        # For non-Profile pictures, we just want the full image.
+        # thumbnail is None anyway
+        name = "-%s-%s.jpg" % (
+            sgroup.get_field("Name"), str(random.randint(100, 999))
+        )
+        sgroup.add_attachment((create_attachment(img.get("full"), name)))
 
 
 @return_type(dict)
@@ -141,11 +203,11 @@ def gather_profile_details_for(link, session, base_url):
     # Parse Case Worker data for the group
     cw_data = parse_case_worker_details(cw_soup)
     contact_info.update_fields(cw_data)
+    sibling_group.update_field('Caseworker__c', contact_info)
 
     log.info("Begin parsing child links from: %s" % link)
     # Parse children
     children_in_group = parse_children_in_group(souped, session, base_url)
-    log.info("Done with: %s" % link)
     names = [
         child.get_field("Name") for child in children_in_group
     ]
@@ -155,21 +217,25 @@ def gather_profile_details_for(link, session, base_url):
     divs = cw_soup.select("> div")
     tare_id = divs[1].text.strip()
     region = divs[3].text.strip()
-    sibling_group.update_field("Case_Number__c", tare_id)
+    sibling_group.update_fields({
+        "Case_Number__c": tare_id,
+        "Children_s_Webpage__c": link,
+        "District__c": region,
+    })
     fields.remove("Case_Number__c")
-    sibling_group.update_field("Children_s_Webpage__c", link)
+    fields.remove("Children_s_Webpage__c")
+    fields.remove("District__c")
 
     for field in fields:
-        selector = CHILD_SELECTORS.get(field)
+        selector = SGROUP_SELECTORS.get(field)
         if field == "Children_s_Bio__c":
             # Start with a blank bio
             bio = ""
             headers = souped.find_all("div.groupHeader")
             bodies = souped.find_all("div.groupBody")
-            zipped = zip(headers, bodies)
 
             # Add all the headers and bodies to the bio
-            for header, body in zipped:
+            for header, body in zip(headers, bodies):
                 bio += "%s\n%s\n\n" % (header.text.strip(), body.text.strip())
 
             # Update siblings' bio
@@ -181,17 +247,21 @@ def gather_profile_details_for(link, session, base_url):
                 field,
                 _selected.text.strip() if _selected else ""
             )
-        else:
-            log.info("%s not yet supported for Siblings" % field)
 
     for child in children_in_group:
         sibling_group.add_child(child)
 
-    sibling_group.update_field('Caseworker__c', contact_info)
-
     log.debug(
         "Child data successfully generated. Returning `%s`" %
         sibling_group.get_field("Name")
+    )
+
+    # Add attachments / images
+    parse_attachments(sibling_group, session, souped, base_url)
+
+    log.debug(
+        "%s have no value." %
+        ", " .join(k for k, v in sibling_group.as_dict().items() if not v)
     )
 
     return sibling_group

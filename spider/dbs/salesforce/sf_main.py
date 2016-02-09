@@ -306,8 +306,7 @@ class Salesforce(object):
             pprint.pprint("Returning an update:\n\n%s\n\n" % x)
         else:
             x = self.sf.Children__c.create(child.as_dict())
-            import pprint
-            pprint.pprint("Returning an added obj:\n\n%s\n\n" % x)
+            self.log.debug("Returning an added obj:\n\n%s\n\n" % x)
             child.update_field("Id", x.get("id"))
 
         # Add attachments and give the attachment's the Child object's ID
