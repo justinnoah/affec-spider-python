@@ -241,7 +241,9 @@ def parse_attachments(child, session, souped, base_url):
     """
     # Get the profile picture attachment
     profile_image_data = get_pictures_encoded(
-        session, souped, CHILD_SELECTORS.get("profile_picture"), base_url, True
+        session, souped,
+        ATTACHMENT_SELECTORS.get("profile_picture"),
+        base_url, True
     )
 
     # Get other images
@@ -251,11 +253,13 @@ def parse_attachments(child, session, souped, base_url):
         base_url, False
     )
 
+    log.debug("GRABBED ALL ATTACHMENTS! %s and %s" % (len(profile_image_data), len(other_images)))
+
     # Create attachments for the profile and thumbnail of the profile
     for img in profile_image_data:
         for k, v in img.iteritems():
             name = "-%s-%s.jpg" % (
-                child.get_field("Name"), str(random.randInt(100, 999))
+                child.get_field("Name"), str(random.randint(100, 999))
             )
             child.add_attachment((create_attachment(v, name)))
 
@@ -264,7 +268,7 @@ def parse_attachments(child, session, souped, base_url):
         # For non-Profile pictures, we just want the full image.
         # thumbnail is None anyway
         name = "-%s-%s.jpg" % (
-            child.get_field("Name"), str(random.randInt(100, 999))
+            child.get_field("Name"), str(random.randint(100, 999))
         )
         child.add_attachment((create_attachment(img.get("full"), name)))
 
@@ -295,6 +299,9 @@ def gather_profile_details_for(link, session, base_url):
 
     # Get a smaller soup for the contact data since it's contained in one area
     contact = parse_contact_info(souped)
+
+    # Get pictures/attachments
+    parse_attachments(child, session, souped, base_url)
 
     # Add the contact to childself.Case_Worker_Contact__c
     child.update_field("Case_Worker_Contact__c", contact)

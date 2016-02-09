@@ -310,7 +310,30 @@ class Salesforce(object):
             pprint.pprint("Returning an added obj:\n\n%s\n\n" % x)
             child.update_field("Id", x.get("id"))
 
+        # Add attachments and give the attachment's the Child object's ID
+        attachments = list(child.get_attachments())
+        for attachment in attachments:
+            self.add_attachment(attachment, child.get_field("Id"))
+
         return child
+
+    def add_attachment(self, attachment, childid):
+        """
+        Fullfill the add_attachment requirement.
+
+        @type attachment: Attachment
+        @param attachment: The attachment to Insert
+
+        @type childid: String
+        @param childid: The Child ID to associate with the attachment
+
+        @rtype: OrderedDict
+        @return: Attachment ID
+        """
+        attachment.update_field("ParentId", childid)
+
+        attached = self.sf.Attachment.create(attachment.as_dict())
+        return attached
 
     def get_children_by(self, search_criteria, return_fields=[]):
         """

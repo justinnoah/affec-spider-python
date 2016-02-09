@@ -149,8 +149,22 @@ class DBPlugin(Interface):
         @type contact: Contact
         @param contact: Contact to add
 
-        @rtrype: String
+        @rtrype: OrderedDict
         @returns: Contact ID
+        """
+
+    def add_attachment(attachment, childid):
+        """
+        Add an attachment object to the Salesforce Database.
+
+        @type attachment: Attachment
+        @param attachment: The attachment to Insert
+
+        @type childid: String
+        @param childid: Id to associate with the attachment
+
+        @rtype: OrderedDict
+        @return: Attachment ID
         """
 
     def get_contact(contact, create=False):
