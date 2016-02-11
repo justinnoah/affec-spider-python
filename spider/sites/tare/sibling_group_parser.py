@@ -231,6 +231,7 @@ def gather_profile_details_for(link, session, base_url):
         if field == "Children_s_Bio__c":
             # Start with a blank bio
             bio = ""
+
             headers = souped.find_all("div.groupHeader")
             bodies = souped.find_all("div.groupBody")
 
@@ -252,7 +253,7 @@ def gather_profile_details_for(link, session, base_url):
         sibling_group.add_child(child)
 
     log.debug(
-        "Child data successfully generated. Returning `%s`" %
+        "SiblingGroup data successfully generated. Returning `%s`" %
         sibling_group.get_field("Name")
     )
 
