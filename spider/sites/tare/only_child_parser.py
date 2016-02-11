@@ -45,11 +45,6 @@ CHILD_SELECTORS = {
     "District__c": (
         "div##Information > div > div > div:nth-of-type(2) > span"
     ),
-    "Child_s_County__c": "",
-    "Caseworker_Placement_Notes__c": [
-        "div##Information > div:nth-of-type(6) > p",
-        "div##Information > div:nth-of-type(8) > p",
-    ],
 }
 
 CONTACT_SELECTORS = {
@@ -61,7 +56,7 @@ CONTACT_SELECTORS = {
 
 ATTACHMENT_SELECTORS = {
     "profile_picture": "div##Information > div:nth-of-type(1) > a > img",
-    "other_pictures": "div#contentGallery > div > div > a > img",
+    "other_pictures": "div#contentGallery",
 }
 
 
@@ -132,6 +127,19 @@ def parse_child_info(link, soup):
                 grab_child_data(rabbit_itr, fs)
         else:
             grab_child_data(field, fields)
+
+    # Grab the Bio
+    bio = ""
+    info = soup.select_one("div##Information")
+    headers = info.find_all("div", class_="groupHeader")
+    bodies = info.find_all("div", class_="groupBody")
+
+    # Add all the headers and bodies to the bio
+    for header, body in zip(headers, bodies):
+        bio += "%s\n%s\n\n" % (header.text.strip(), body.text.strip())
+
+    # Update siblings' bio
+    child_info.update_field("Child_s_Bio__c", bio.strip())
 
     # Return Data
     return child_info
