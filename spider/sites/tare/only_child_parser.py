@@ -231,12 +231,12 @@ def parse_contact_info(soup):
     return contact_info
 
 
-def parse_attachments(child, session, souped, base_url):
+def parse_attachments(cname, session, souped, base_url):
     """
     Parse attachments and add them to the child object.
 
-    @type child: Child
-    @param child: Child to have attachments / pictures added to.
+    @type cname: String
+    @param cname: Child's name.
 
     @type session: requests session
     @param session: The "browser" session that has us logged into TARE.
@@ -248,17 +248,28 @@ def parse_attachments(child, session, souped, base_url):
     @param base_url: The beginning of all TARE urls.
     """
     # Get the profile picture attachment
-    profile_image_data = get_pictures_encoded(
-        session, souped,
-        ATTACHMENT_SELECTORS.get("profile_picture"),
-        base_url, True
-    )
+    try:
+        profile_img_tag = souped.select(
+            ATTACHMENT_SELECTORS["profile_picture"]
+        )[0]
+        if profile_img_tag.get("src"):
+            profile_image_data = get_pictures_encoded(
+                session, base_url, [profile_img_tag.get("src")], True
+            )
+    except IndexError:
+        profile_image_data = {'full': None, 'thumbnail': None}
+
+    gallery = souped.select_one(ATTACHMENT_SELECTORS.get("other_pictures"))
+    urls = []
+    if gallery:
+        other_img_tags = gallery.find_all("img", class_="galleryImage")
+        for tag in other_img_tags:
+            if tag.get("src"):
+                urls.append(tag.get("src"))
 
     # Get other images
     other_images = get_pictures_encoded(
-        session, souped,
-        ATTACHMENT_SELECTORS.get("other_pictures"),
-        base_url, False
+        session, base_url, urls, False
     )
 
     log.debug(
@@ -267,22 +278,25 @@ def parse_attachments(child, session, souped, base_url):
         )
     )
 
+    attachments_returned = []
+
     # Create attachments for the profile and thumbnail of the profile
     for img in profile_image_data:
         for k, v in img.iteritems():
-            name = "-%s-%s.jpg" % (
-                child.get_field("Name"), str(random.randint(100, 999))
-            )
-            child.add_attachment((create_attachment(v, name)))
+            name = "%s-%s.jpg" % (cname, str(random.randint(100, 999)))
+            attachments_returned.append(create_attachment(v, name))
 
     # Create attachments of all other images and append a number to the name
     for i, img in enumerate(other_images):
         # For non-Profile pictures, we just want the full image.
         # thumbnail is None anyway
-        name = "-%s-%s.jpg" % (
-            child.get_field("Name"), str(random.randint(100, 999))
-        )
-        child.add_attachment((create_attachment(img.get("full"), name)))
+        name = "%s-%s.jpg" % (cname, str(random.randint(100, 999)))
+        attachments_returned.append((create_attachment(img.get("full"), name)))
+
+    log.debug("Returning %s attachments for %s" % (
+        len(attachments_returned), cname)
+    )
+    return list(attachments_returned)
 
 
 @return_type(Child)
@@ -313,7 +327,14 @@ def gather_profile_details_for(link, session, base_url):
     contact = parse_contact_info(souped)
 
     # Get pictures/attachments
-    parse_attachments(child, session, souped, base_url)
+    attachments = parse_attachments(
+        child.get_field("Name"), session, souped, base_url
+    )
+    log.debug("Adding %s images to %s from\n\t%s" % (
+        len(attachments), child.get_field("Name"), link
+    ))
+    for attachment in attachments:
+        child.add_attachment(attachment)
 
     # Add the contact to childself.Case_Worker_Contact__c
     child.update_field("Case_Worker_Contact__c", contact)

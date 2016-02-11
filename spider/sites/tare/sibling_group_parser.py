@@ -84,12 +84,12 @@ def parse_children_in_group(soup, session, base_url):
     return children
 
 
-def parse_attachments(sgroup, session, souped, base_url):
+def parse_attachments(sgname, session, souped, base_url):
     """
     Parse attachments and add them to the child object.
 
-    @type sgroup: SiblingGroup
-    @param child: SiblingGroup to have attachments / pictures added to.
+    @type sgname: String
+    @param child: SiblingGroup name.
 
     @type session: requests session
     @param session: The "browser" session that has us logged into TARE.
@@ -100,18 +100,30 @@ def parse_attachments(sgroup, session, souped, base_url):
     @type base_url: String
     @param base_url: The beginning of all TARE urls.
     """
-    # Get the profile picture attachment
-    profile_image_data = get_pictures_encoded(
-        session, souped,
-        ATTACHMENT_SELECTORS.get("profile_picture"),
-        base_url, True
-    )
+    sgname = sgname.replace(", ", "")
 
-    # Get other images
+    try:
+        profile_img_tag = souped.select(
+            ATTACHMENT_SELECTORS["profile_picture"]
+        )[0]
+        if profile_img_tag.get("src"):
+            profile_image_data = get_pictures_encoded(
+                session, base_url, [profile_img_tag.src], True
+            )
+    except IndexError:
+        profile_image_data = {'full': None, 'thumbnail': None}
+
+    gallery = souped.select_one(ATTACHMENT_SELECTORS.get("other_pictures"))
+    urls = []
+    if gallery:
+        other_img_tags = gallery.find_all("img", class_="galleryImage")
+        for tag in other_img_tags:
+            if tag.get("src"):
+                urls.append(tag.src)
+
+        # Get other images
     other_images = get_pictures_encoded(
-        session, souped,
-        ATTACHMENT_SELECTORS.get("other_pictures"),
-        base_url, False
+        session, base_url, urls, False
     )
 
     log.debug(
@@ -120,22 +132,26 @@ def parse_attachments(sgroup, session, souped, base_url):
         )
     )
 
+    attachments_returned = []
+
     # Create attachments for the profile and thumbnail of the profile
     for img in profile_image_data:
         for k, v in img.iteritems():
-            name = "-%s-%s.jpg" % (
-                sgroup.get_field("Name"), str(random.randint(100, 999))
+            name = "%s-%s.jpg" % (
+                sgname, str(random.randint(100, 999))
             )
-            sgroup.add_attachment((create_attachment(v, name)))
+            attachments_returned.append((create_attachment(v, name)))
 
     # Create attachments of all other images and append a number to the name
     for i, img in enumerate(other_images):
         # For non-Profile pictures, we just want the full image.
         # thumbnail is None anyway
-        name = "-%s-%s.jpg" % (
-            sgroup.get_field("Name"), str(random.randint(100, 999))
+        name = "%s-%s.jpg" % (
+            sgname, str(random.randint(100, 999))
         )
-        sgroup.add_attachment((create_attachment(img.get("full"), name)))
+        attachments_returned.append((create_attachment(img.get("full"), name)))
+
+    return list(attachments_returned)
 
 
 @return_type(dict)
@@ -258,7 +274,9 @@ def gather_profile_details_for(link, session, base_url):
     )
 
     # Add attachments / images
-    parse_attachments(sibling_group, session, souped, base_url)
+    attachments = parse_attachments(sibling_group, session, souped, base_url)
+    for attachment in attachments:
+        sibling_group.add_attachment(attachment)
 
     log.debug(
         "%s have no value." %

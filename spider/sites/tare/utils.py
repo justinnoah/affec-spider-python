@@ -75,8 +75,7 @@ def generate_thumbnail(img_data):
     img = Image.open(StringIO(img_data))
     # Width and height to scale for the thumbnail
     i_width, i_height = img.size
-    ratio = i_height / 230.0
-    new_width = floor(i_width * ratio)
+    new_width = (230 * i_width) / i_height
     new_height = 230.0
 
     # Resize the image
@@ -88,12 +87,12 @@ def generate_thumbnail(img_data):
     return thumbnail_b64
 
 
-def get_pictures_encoded(session, html, selector, url, thumbnail=False):
+def get_pictures_encoded(session, base_url, urls, thumbnail=False):
     """Pull Profile picture and create thumbnail of it. Height of 230px."""
     data = []
 
-    for img in html.select(selector):
-        img_url = "%s%s" % (url, img.get("src"))
+    for url in urls:
+        img_url = "%s%s" % (base_url, url)
         img_data = session.get(img_url).content
         img_data_b64 = b64encode(img_data)
 

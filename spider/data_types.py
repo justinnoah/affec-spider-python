@@ -142,13 +142,12 @@ class AllChildren(object):
 class _DBObject(object):
     """Database object."""
 
-    # A list of Attachment type objects
-    _attachments = []
-
     def __init__(self, name, constants, variables):
         self.table_name = name
         self._constant_fields = constants
         self._variable_fields = variables
+        # A list of Attachment type objects
+        self._attachments = []
 
     def get_attachments(self):
         """

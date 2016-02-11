@@ -299,21 +299,26 @@ class Salesforce(object):
 
         child_id = child.get_field("Id")
         if child_id:
-            x = self.sf.Children__c.update(
+            self.sf.Children__c.update(
                 child.get_field("Id"), child.as_dict()
             )
-            import pprint
-            pprint.pprint("Returning an update:\n\n%s\n\n" % x)
         else:
             x = self.sf.Children__c.create(child.as_dict())
-            self.log.debug("Returning an added obj:\n\n%s\n\n" % x)
             child.update_field("Id", x.get("id"))
 
         # Add attachments and give the attachment's the Child object's ID
-        attachments = list(child.get_attachments())
+        attachments = child.get_attachments()
+        self.log.debug(
+            "Adding %s attachments for %s from\n\t%s." % (
+                len(attachments),
+                child.get_field("Name"),
+                child.get_field("Link_to_Child_s_Page__c"),
+            )
+        )
         for attachment in attachments:
-            a = self.add_attachment(attachment, child.get_field("Id"))
-            self.log.debug("Adding attachment: %s" % a)
+            self.log.debug(
+                self.add_attachment(attachment, child.get_field("Id"))
+            )
 
         return child
 
