@@ -11,6 +11,15 @@ for Salesforce or MySQL the exposed API is the same.
 To setup a virtual environment is recommended in order to not clobber system
 dependencies. You can read about them here: https://virtualenv.pypa.io/en/latest/
 
+Getting python modules for a virtualenv sometimes requires a few system libraries
+as well. Spider needs the following dev/devel packages:
+
+python libxml2 libxslt zlib libjpeg
+
+and possibly for some rare situations, the following as well:
+
+libtiff openjpeg libwepb
+
 The core spider dependencies are located in the top directory as requirements.txt.
 Use `pip install -r requirements.txt` to install them. Each plugin being used
 may have their own dependencies which should be located in their respective
