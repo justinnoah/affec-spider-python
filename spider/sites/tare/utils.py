@@ -16,7 +16,6 @@
 
 from base64 import b64encode
 from datetime import date
-from math import floor
 from cStringIO import StringIO
 
 from PIL import Image
@@ -87,6 +86,33 @@ def generate_thumbnail(img_data):
     return thumbnail_b64
 
 
+def scale_portrait(img_data):
+    """Restrict the image size to a max of 1024x768 keeping original ratio."""
+    # Scale the portrait to a standard size
+    img = Image.open(StringIO(img_data))
+    in_memory_save = StringIO()
+    # Width and height to scale for the portrait
+    i_width, i_height = img.size
+
+    # Do not rescale if smaller than 1024x768
+    if i_width < 1024 and i_height < 768:
+        img.save(in_memory_save, format="jpeg")
+        return b64encode(in_memory_save.getvalue())
+
+    # If wider than tall
+    if i_width >= i_height:
+        new_width = 768
+        new_height = (768 * i_height) / i_width
+    # if taller than wide
+    else:
+        new_height = 1024
+        new_width = (1024 * i_width) / i_height
+
+    scaled = img.resize((int(new_width), int(new_height)), Image.ANTIALIAS)
+    scaled.save(in_memory_save, format="jpeg")
+    return b64encode(in_memory_save.getvalue())
+
+
 def get_pictures_encoded(session, base_url, urls, thumbnail=False):
     """Pull Profile picture and create thumbnail of it. Height of 230px."""
     data = []
@@ -94,7 +120,7 @@ def get_pictures_encoded(session, base_url, urls, thumbnail=False):
     for url in urls:
         img_url = "%s%s" % (base_url, url)
         img_data = session.get(img_url).content
-        img_data_b64 = b64encode(img_data)
+        img_data_b64 = scale_portrait(img_data)
 
         # Thumbnail
         thumbnail_b64 = None if not thumbnail else generate_thumbnail(img_data)

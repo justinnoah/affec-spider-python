@@ -16,6 +16,7 @@
 
 import re
 
+from bs4 import BeautifulSoup
 from simple_salesforce import Salesforce as sfdb
 from twisted.logger import Logger
 from zope.interface import implements
@@ -317,12 +318,16 @@ class Salesforce(object):
         )
         for attachment in attachments:
             self.log.debug(
-                self.add_attachment(attachment, child.get_field("Id"))
+                self.add_attachment(
+                    attachment,
+                    child.get_field("Id"),
+                    child.get_field('FirstName')
+                )
             )
 
         return child
 
-    def add_attachment(self, attachment, childid):
+    def add_attachment(self, attachment, childid, childname):
         """
         Fullfill the add_attachment requirement.
 
@@ -335,8 +340,20 @@ class Salesforce(object):
         @rtype: OrderedDict
         @return: Attachment ID
         """
-        attachment.update_field("ParentId", childid)
 
+        attachment.update_field("ParentId", childid)
+        b64_data = attachment.get_field("Body")
+        img = BeautifulSoup('', 'lxml')
+        img_tag = img.new_tag(
+            "img",
+            alt=childname,
+            src="data:image/jpeg;base64,%s===" % b64_data,
+        )
+        img.append(img_tag)
+        self.sf.Children__c.update(
+            childid,
+            {'Child_s_Photo__c': img.prettify()}
+        )
         attached = self.sf.Attachment.create(attachment.as_dict())
         return attached
 
@@ -448,7 +465,7 @@ class Salesforce(object):
         # Add attachments and give the attachment's the Child object's ID
         attachments = list(sgroup.get_attachments())
         for attachment in attachments:
-            a = self.add_attachment(attachment, sgroup.get_field("Id"))
+            a = self.add_attachment(attachment, sgroup.get_field("Id"), "SGROUP")
             self.log.debug("Adding attachment: %s" % a)
 
         return sgroup
