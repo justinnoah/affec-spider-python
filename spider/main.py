@@ -20,9 +20,11 @@ import string
 import sys
 
 from configobj import ConfigObj, ConfigObjError
-from twisted.logger import Logger, globalLogPublisher, textFileLogObserver
+from twisted.logger import (
+    FilteringLogObserver, Logger, LogLevel, LogLevelFilterPredicate,
+    globalLogPublisher, textFileLogObserver
+)
 
-from data_types import AllChildren
 from plugin import load_database_plugin, load_site_plugins
 
 
@@ -74,7 +76,7 @@ def import_data(plugins):
         'database': DBPlugin
     }
     """
-    log.info("Begin parsing / importing data from sites.")
+    log.info("Begin parsing and importing data from sites.")
     # For each site listed in the config
     for site in plugins['sites']:
         # grab all chilrden and sibling groups
@@ -115,8 +117,12 @@ def main(config_path=None):
 
 
 if __name__ == '__main__':
-    globalLogPublisher.addObserver(
-        textFileLogObserver(open("spider.log", 'w'))
+    log_filter = LogLevelFilterPredicate(LogLevel.info)
+    all_abserver = textFileLogObserver(open("spider.log", 'w'))
+    filtered_observer = FilteringLogObserver(
+        textFileLogObserver(sys.stdout),
+        [log_filter]
     )
-    globalLogPublisher.addObserver(textFileLogObserver(sys.stdout))
+    globalLogPublisher.addObserver(all_abserver)
+    globalLogPublisher.addObserver(filtered_observer)
     sys.exit(main())

@@ -306,7 +306,7 @@ def gather_profile_details_for(link, session, base_url):
 
     Photos, Name, TareId, Age (to be converted to a birthdate), others
     """
-    log.info("Only Child:\n%s" % link)
+    log.info("Child:\n%s" % link)
     # Data required to have for a child
 
     # "Import" the html into BeautifulSoup for easy traversal

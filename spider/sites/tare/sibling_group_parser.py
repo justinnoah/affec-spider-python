@@ -219,7 +219,7 @@ def gather_profile_details_for(link, session, base_url):
     contact_info.update_fields(cw_data)
     sibling_group.update_field('Caseworker__c', contact_info)
 
-    log.info("Begin parsing child links from: %s" % link)
+    log.info("Begin parsing child links from:\n%s" % link)
     # Parse children
     children_in_group = parse_children_in_group(souped, session, base_url)
     names = [
