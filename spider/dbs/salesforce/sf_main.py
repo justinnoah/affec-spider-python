@@ -321,39 +321,51 @@ class Salesforce(object):
                 self.add_attachment(
                     attachment,
                     child.get_field("Id"),
-                    child.get_field('FirstName')
+                    child.get_field('FirstName'),
+                    Child,
                 )
             )
 
         return child
 
-    def add_attachment(self, attachment, childid, childname):
+    def add_attachment(self, attachment, sid, name, t):
         """
         Fullfill the add_attachment requirement.
 
         @type attachment: Attachment
         @param attachment: The attachment to Insert
 
-        @type childid: String
-        @param childid: The Child ID to associate with the attachment
+        @type sid: String
+        @param sid: The object ID to associate with the attachment
+
+        @type name: String
+        @param name: Name field of the Child or SiblingGroup
+
+        @type t: type
+        @param t: Child or SiblingGroup
 
         @rtype: OrderedDict
         @return: Attachment ID
         """
-
-        attachment.update_field("ParentId", childid)
+        attachment.update_field("ParentId", sid)
         b64_data = attachment.get_field("Body")
         img = BeautifulSoup('', 'lxml')
         img_tag = img.new_tag(
             "img",
-            alt=childname,
+            alt=name,
             src="data:image/jpeg;base64,%s===" % b64_data,
         )
         img.append(img_tag)
-        self.sf.Children__c.update(
-            childid,
-            {'Child_s_Photo__c': img.prettify()}
-        )
+        if isinstance(t, Child):
+            self.sf.Children__c.update(
+                sid,
+                {'Child_s_Photo__c': img.prettify()}
+            )
+        elif isinstance(t, SiblingGroup):
+            self.sf.Sibling_Group__c.update(
+                sid,
+                {'Sibling_Photo__c': img.prettify()}
+            )
         attached = self.sf.Attachment.create(attachment.as_dict())
         return attached
 
@@ -446,11 +458,15 @@ class Salesforce(object):
             SiblingGroup
         )
 
+        self.log.debug("EXISTING SGROUPS: %s" % existing_tare_id_results)
+
         # Are we updating or creating?
         if not existing_tare_id_results.is_empty():
             self.log.debug("TARE Id exists in the database already, updating.")
-            existing_group = existing_tare_id_results.get_siblings()[0]
-            gr_id = existing_group.get_field("Id")
+            existing_group = existing_tare_id_results.get_siblings()
+            for g in existing_group:
+                self.log.debug("New groups!: %s" % g)
+            gr_id = existing_group[0].get_field("Id")
             self.log.debug("Updating sibling group with Id: %s" % gr_id)
             sgroup.update_field("Id", gr_id)
 
@@ -465,42 +481,68 @@ class Salesforce(object):
         # Add attachments and give the attachment's the Child object's ID
         attachments = list(sgroup.get_attachments())
         for attachment in attachments:
-            a = self.add_attachment(attachment, sgroup.get_field("Id"), "SGROUP")
+            a = self.add_attachment(
+                attachment,
+                sgroup.get_field("Id"),
+                sgroup.get_field("Name"),
+                SiblingGroup
+            )
             self.log.debug("Adding attachment: %s" % a)
 
         return sgroup
 
-    def get_sibling_group_by(self, search_criteria):
+    def get_sibling_group_by(self, search_criteria, return_fields=[]):
         """
-        Simple query result of a SiblingGroup objects.
+        Simple query result of a Child objects.
 
         @type search_criteria: dict
         @param search_criteria: A dictionary of keys and values
-        to search SiblingGroups by.
+        to search children by.
+
+        @type return_fields: list(String)
+        @param return_fields: The fields the query should return,
+        if none are passed, only Id is returned
 
         @rtype: list
-        @return: Return results from salesforce of sibling group Ids only.
+        @return: Return results from salesforce of children Ids only.
         """
         # Query string
-        query_string = "SELECT Id FROM Sibling_Group__c WHERE %(where_fields)s"
-
-        # Parse the dict indo a where clause
-        fields = []
-        for k, v in search_criteria.items():
-            fields.append("%s = '%s'" % (k, v))
-
-        where_fields = " OR ".join(fields)
-
-        # Use the internal query method to query
-        results = self._query(
-            query_string % {'where_fields': where_fields}
+        query_string = (
+            "SELECT %(select_fields)s "
+            "FROM Sibling_Group__c "
+            "WHERE %(where_fields)s"
         )
 
-        # Return results as a list
-        if results:
-            return [results] if not type(results) == list else results
-        else:
-            return []
+        # select fiesds, we always return at least Id
+        s_fields = set(["Id"])
+        for field in return_fields:
+            s_fields.append(field)
+
+        # Join the list of s_fields into a string separated by ", "
+        select_fields = ", ".join(s_fields)
+
+        # Parse the dict indo a where clause
+        w_fields = []
+        for k, v in search_criteria.items():
+            w_fields.append("%s = '%s'" % (k, v))
+
+        # Join the list of w_filds into a string separated by AND
+        where_fields = " AND ".join(w_fields)
+
+        # Use the internal query method to query
+        final_query = query_string % {
+            'select_fields': select_fields,
+            'where_fields': where_fields
+        }
+
+        results = self._query(final_query)["records"]
+
+        self.log.debug("\nQuery: %s\n\nResults: %s" % (
+            unicode(final_query),
+            unicode(results)
+        ))
+
+        return results
 
     def get_sibling_group_count(self):
         """Return the number of SiblingGroup objects in the database."""

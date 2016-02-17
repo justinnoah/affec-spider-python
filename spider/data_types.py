@@ -33,9 +33,6 @@ class AllChildren(object):
     def __init__(self, children=[], siblings=[]):
         """Let's do some type checking upfront to make life a bit easier."""
         log.debug("Creating new AllChildren instance")
-        log.debug(
-            "SHOULD BE 0: %s and %s" % (len(children), len(siblings))
-        )
         if not ((type(children) == list) and (type(siblings) == list)):
             raise TypeError("children and siblings must be a list")
 
@@ -98,6 +95,7 @@ class AllChildren(object):
         @type child: Child
         @param child: Child object to be added.
         """
+        log.debug("Adding Child.Name: %s" % child.get_field("Name"))
 
         if type(child) != Child:
             raise TypeError(
@@ -132,6 +130,12 @@ class AllChildren(object):
     def is_empty(self):
         """Checks whether self contains any Child or SiblingGroup objects."""
         count = len(self.get_children()) + len(self.get_siblings())
+        log.debug("is_empty count: %s" % count)
+        log.debug(
+            "\nChildren: %s\nSiblingGroups: %s" % (
+                self.get_children(), self.get_siblings()
+            )
+        )
 
         if not count:
             return True
