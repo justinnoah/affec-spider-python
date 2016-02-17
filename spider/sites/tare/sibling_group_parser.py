@@ -27,7 +27,7 @@ from validators import valid_email, valid_phone
 
 log = Logger()
 
-ALL_CHILDREN_SELECTOR = "div#pageContent > div > div:nth-of-type(5) > div"
+ALL_CHILDREN_SELECTOR = "div#pageContent > div > div.galleryImage"
 CASE_WORKER_SELECTOR = "div#pageContent > div > div:nth-of-type(6)"
 
 # These are the magic phrases that get the data from a TARE profile page
@@ -68,19 +68,18 @@ ATTACHMENT_SELECTORS = {
 def parse_children_in_group(soup, session, base_url):
     """Parse each child's name out of the sibling group."""
     children = []
-    children_to_parse = soup.select(ALL_CHILDREN_SELECTOR)
-    for i, child_link in enumerate(children_to_parse):
-        small_soup = BeautifulSoup(str(child_link), "lxml")
-        _sub_link = small_soup.select_one(
-            SGROUP_SELECTORS.get("Name")
-        )
-        if _sub_link:
-            sub_link = _sub_link.get("href")
-            link = "%s%s" % (base_url, sub_link)
-            child = gather_child(link, session, base_url)
-            log.debug("link: %s" % link)
+    children_to_parse = soup.select_one(
+        ALL_CHILDREN_SELECTOR
+    ).find_next_sibling()
+    links = children_to_parse.select("a")
+    for link in links:
+        sub_url = link.get("href")
+        if "TARE/Child" in sub_url:
+            full_link = "%s%s" % (base_url, sub_url)
+            child = gather_child(full_link, session, base_url)
             children.append(child)
 
+    log.debug("RETURNING %s child(ren)" % len(children))
     return children
 
 
@@ -108,7 +107,7 @@ def parse_attachments(sgname, session, souped, base_url):
         )[0]
         if profile_img_tag.get("src"):
             profile_image_data = get_pictures_encoded(
-                session, base_url, [profile_img_tag.src], True
+                session, base_url, [profile_img_tag.get("src")], True
             )
     except IndexError:
         profile_image_data = {'full': None, 'thumbnail': None}
@@ -195,8 +194,7 @@ def gather_profile_details_for(link, session, base_url):
 
     Photos, Name, TareId, Age (to be converted to a birthdate), others
     """
-    log.debug("Cloning siblings, contact, and fields objects")
-    log.info("Sibling Group:\n%s" % link)
+    log.debug("Sibling Group:\n%s" % link)
     # Data required to have for a sibling group
     sibling_group = SiblingGroup()
     contact_info = Contact()
@@ -221,27 +219,39 @@ def gather_profile_details_for(link, session, base_url):
     contact_info.update_fields(cw_data)
     sibling_group.update_field('Caseworker__c', contact_info)
 
-    log.info("Begin parsing child links from: %s" % link)
+    log.info("Begin parsing child links from:\n%s" % link)
     # Parse children
     children_in_group = parse_children_in_group(souped, session, base_url)
     names = [
         child.get_field("Name") for child in children_in_group
     ]
+    log.debug("Children: %s" % names)
     sibling_group.update_field("Name", ", ".join(names))
+    log.debug("SGroup Name: %s" % sibling_group.get_field("Name"))
     fields.remove("Name")
 
-    divs = cw_soup.select("> div")
-    tare_id = divs[1].text.strip()
-    region = divs[3].text.strip()
-    sibling_group.update_fields({
-        "Case_Number__c": tare_id,
-        "Children_s_Webpage__c": link,
-        "District__c": region,
-    })
-    fields.remove("Case_Number__c")
-    fields.remove("Children_s_Webpage__c")
-    fields.remove("District__c")
+    # Add children to the SiblingGroup object
+    for child in children_in_group:
+        sibling_group.add_child(child)
 
+    log.debug("Added children to the SiblingGroup object")
+
+    try:
+        divs = cw_soup.select("> div")
+        tare_id = divs[1].text.strip()
+        region = divs[3].text.strip()
+        sibling_group.update_fields({
+            "Case_Number__c": tare_id,
+            "Children_s_Webpage__c": link,
+            "District__c": region,
+        })
+        fields.remove("Case_Number__c")
+        fields.remove("Children_s_Webpage__c")
+        fields.remove("District__c")
+    except Exception, e:
+        log.debug("%s" % e)
+
+    log.debug("Begin SGroup Field parsing")
     for field in fields:
         selector = SGROUP_SELECTORS.get(field)
         if field == "Children_s_Bio__c":
@@ -265,22 +275,22 @@ def gather_profile_details_for(link, session, base_url):
                 _selected.text.strip() if _selected else ""
             )
 
-    for child in children_in_group:
-        sibling_group.add_child(child)
-
-    log.debug(
-        "SiblingGroup data successfully generated. Returning `%s`" %
-        sibling_group.get_field("Name")
-    )
-
+    log.debug("SiblingGroup ATTACHMENTS")
     # Add attachments / images
-    attachments = parse_attachments(sibling_group, session, souped, base_url)
+    attachments = parse_attachments(
+        sibling_group.get_field("Name"), session, souped, base_url
+    )
     for attachment in attachments:
         sibling_group.add_attachment(attachment)
 
     log.debug(
         "%s have no value." %
         ", " .join(k for k, v in sibling_group.as_dict().items() if not v)
+    )
+
+    log.debug(
+        "SiblingGroup data successfully generated. Returning `%s`" %
+        sibling_group.get_field("Name")
     )
 
     return sibling_group

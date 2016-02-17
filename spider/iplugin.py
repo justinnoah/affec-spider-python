@@ -153,7 +153,7 @@ class DBPlugin(Interface):
         @returns: Contact ID
         """
 
-    def add_attachment(attachment, childid, name):
+    def add_attachment(attachment, id, name, t):
         """
         Add an attachment object to the Salesforce Database.
 
