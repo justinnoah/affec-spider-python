@@ -27,7 +27,7 @@ from validators import valid_email, valid_phone
 
 log = Logger()
 
-ALL_CHILDREN_SELECTOR = "div#pageContent > div > div:nth-of-type(5) > div"
+ALL_CHILDREN_SELECTOR = "div#pageContent > div > div.galleryImage"
 CASE_WORKER_SELECTOR = "div#pageContent > div > div:nth-of-type(6)"
 
 # These are the magic phrases that get the data from a TARE profile page
@@ -68,17 +68,15 @@ ATTACHMENT_SELECTORS = {
 def parse_children_in_group(soup, session, base_url):
     """Parse each child's name out of the sibling group."""
     children = []
-    children_to_parse = soup.select(ALL_CHILDREN_SELECTOR)
-    for i, child_link in enumerate(children_to_parse):
-        small_soup = BeautifulSoup(str(child_link), "lxml")
-        _sub_link = small_soup.select_one(
-            SGROUP_SELECTORS.get("Name")
-        )
-        if _sub_link:
-            sub_link = _sub_link.get("href")
-            link = "%s%s" % (base_url, sub_link)
-            child = gather_child(link, session, base_url)
-            log.debug("link: %s" % link)
+    children_to_parse = soup.select_one(
+        ALL_CHILDREN_SELECTOR
+    ).find_next_sibling()
+    links = children_to_parse.select("a")
+    for link in links:
+        sub_url = link.get("href")
+        if "TARE/Child" in sub_url:
+            full_link = "%s%s" % (base_url, sub_url)
+            child = gather_child(full_link, session, base_url)
             children.append(child)
 
     log.debug("RETURNING %s child(ren)" % len(children))
@@ -196,8 +194,7 @@ def gather_profile_details_for(link, session, base_url):
 
     Photos, Name, TareId, Age (to be converted to a birthdate), others
     """
-    log.debug("Cloning siblings, contact, and fields objects")
-    log.info("Sibling Group:\n%s" % link)
+    log.debug("Sibling Group:\n%s" % link)
     # Data required to have for a sibling group
     sibling_group = SiblingGroup()
     contact_info = Contact()
@@ -280,7 +277,9 @@ def gather_profile_details_for(link, session, base_url):
 
     log.debug("SiblingGroup ATTACHMENTS")
     # Add attachments / images
-    attachments = parse_attachments(sibling_group.get_field("Name"), session, souped, base_url)
+    attachments = parse_attachments(
+        sibling_group.get_field("Name"), session, souped, base_url
+    )
     for attachment in attachments:
         sibling_group.add_attachment(attachment)
 

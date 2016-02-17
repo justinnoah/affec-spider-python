@@ -356,12 +356,12 @@ class Salesforce(object):
             src="data:image/jpeg;base64,%s===" % b64_data,
         )
         img.append(img_tag)
-        if isinstance(t, Child):
+        if t is Child:
             self.sf.Children__c.update(
                 sid,
                 {'Child_s_Photo__c': img.prettify()}
             )
-        elif isinstance(t, SiblingGroup):
+        elif t is SiblingGroup:
             self.sf.Sibling_Group__c.update(
                 sid,
                 {'Sibling_Photo__c': img.prettify()}

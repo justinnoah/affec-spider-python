@@ -102,7 +102,7 @@ def main(config_path=None):
 
     try:
         cfg = load_config(config_path) if config_path else load_config()
-    except [Exception, ConfigObjError], e:
+    except ConfigObjError, e:
         log.failure(str(e))
 
     site_plugins = load_site_plugins(cfg['sites'])
