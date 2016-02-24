@@ -177,7 +177,8 @@ class _DBObject(object):
         @type value: object
         @param value: Data assigned to a field
         """
-        self._variable_fields[key] = value
+        if key not in self._constant_fields:
+            self._variable_fields[key] = value
 
     def update_fields(self, d):
         """
