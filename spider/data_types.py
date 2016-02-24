@@ -290,9 +290,9 @@ class Child(_DBObject):
             # Child Bulletin Date
             "Child_Bulletin_Date__c": "%s" % date.today().isoformat(),
             # Child's State
-            "Child_s_State__c": "TX",
+            "Child_s_State__c": "Texas TX",
             # Legal Status - If Possible
-            "Legal_Status__c": '',
+            "Legal_Status2__c": "Unknown",
             # District/Region - District Number
             "District__c": 0,
             # Child's County - If Possible
@@ -359,7 +359,7 @@ class SiblingGroup(_DBObject):
             # All Children comma separated with an and before the last
             "Name": '',
             # Legal status if possible
-            "Legal_Status2__c": '',
+            "Legal_Status2__c": "Unknown",
             # generated with positional B-H suffichildren - generated
             # "Bulletin_Number__c": '',
             # Children's names
@@ -374,7 +374,7 @@ class SiblingGroup(_DBObject):
             # County - if available
             "Child_s_County__c": None,
             # Siblings' State
-            "State__c": 'TX',
+            "State__c": 'Texas TX',
             # Primary Contact
             "Caseworker__c": None,
             "Children_s_Bio__c": None,
