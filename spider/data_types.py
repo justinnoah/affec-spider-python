@@ -300,7 +300,7 @@ class Child(_DBObject):
             # State Case Number - tareID
             "Case_Number__c": '',
             # Caseworker Placement Notes - Bio
-            "Caseworker_Placement_Notes__c": '',
+            "Caseworker_Placement_Notes__c": None,
             # Link to Child's Page - Tare Link
             "Link_to_Child_s_Page__c": "",
             # CW Update to Families
@@ -363,23 +363,23 @@ class SiblingGroup(_DBObject):
             # generated with positional B-H suffichildren - generated
             # "Bulletin_Number__c": '',
             # Children's names
-            "Child_1_First_Name__c": '',
-            "Child_2_First_Name__c": '',
-            "Child_3_First_Name__c": '',
-            "Child_4_First_Name__c": '',
-            "Child_5_First_Name__c": '',
-            "Child_6_First_Name__c": '',
-            "Child_7_First_Name__c": '',
-            "Child_8_First_Name__c": '',
+            "Child_1_First_Name__c": None,
+            "Child_2_First_Name__c": None,
+            "Child_3_First_Name__c": None,
+            "Child_4_First_Name__c": None,
+            "Child_5_First_Name__c": None,
+            "Child_6_First_Name__c": None,
+            "Child_7_First_Name__c": None,
+            "Child_8_First_Name__c": None,
             # County - if available
-            "Child_s_County__c": '',
+            "Child_s_County__c": None,
             # Siblings' State
             "State__c": 'TX',
             # Primary Contact
-            "Caseworker__c": '',
-            "Children_s_Bio__c": '',
-            "Caseworker_Placement_Notes__c": '',
-            'Children_s_Webpage__c': '',
+            "Caseworker__c": None,
+            "Children_s_Bio__c": None,
+            "Caseworker_Placement_Notes__c": None,
+            'Children_s_Webpage__c': None,
         }
 
         super(SiblingGroup, self).__init__(name, constants, variables)
