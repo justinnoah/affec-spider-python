@@ -70,6 +70,7 @@ class Salesforce(object):
             security_token=self.config['token'],
             sandbox=bool(self.config['sandbox']),
         )
+        self.report = open("Report.txt", 'w')
 
         self.nationalities = []
 
@@ -174,7 +175,7 @@ class Salesforce(object):
             # is not needed for anything here.
             self.add_or_update_sibling_group(sgroup)
 
-    def find_by_case_number(self, case_number, t=None):
+    def find_by_case_number(self, case_number, t=None, return_fields=[]):
         """
         Find either Children or SiblingGroups with `case_number`.
 
@@ -203,20 +204,20 @@ class Salesforce(object):
 
         # Type not specified, return both
         if not t:
-            children = self.get_children_by(criteria)
-            siblings = self.get_sibling_group_by(criteria)
+            children = self.get_children_by(criteria, return_fields)
+            siblings = self.get_sibling_group_by(criteria, return_fields)
             for child in self._results_to_childs(children):
                 existing_results.add_child(child)
             for sibling in self._results_to_sibling_groups(siblings):
                 existing_results.add_or_update_sibling_group(sibling)
         # Return results from Children__c
         elif t == Child:
-            children = self.get_children_by(criteria)
+            children = self.get_children_by(criteria, return_fields)
             for child in self._results_to_childs(children):
                 existing_results.add_child(child)
         # Return results from Sibling_Group__c
         elif t == SiblingGroup:
-            siblings = self.get_sibling_group_by(criteria)
+            siblings = self.get_sibling_group_by(criteria, return_fields)
             for sibling in self._results_to_sibling_groups(siblings):
                 existing_results.add_sibling_group(sibling)
         # Uh-oh, not good.
@@ -248,10 +249,13 @@ class Salesforce(object):
             child.get_field("Link_to_Child_s_Page__c")
         ))
 
+        save_fields = child.get_variable_fields()
+
         # Check for existing with TareId
         existing_tare_id_results = self.find_by_case_number(
             child.get_field("Case_Number__c"),
-            Child
+            Child,
+            return_fields=save_fields
         )
 
         # Are we updating or creating?
@@ -299,11 +303,58 @@ class Salesforce(object):
 
         child_id = child.get_field("Id")
         if child_id:
-            self.sf.Children__c.update(
-                child.get_field("Id"), child.as_dict()
-            )
+            in_db_child = existing_child.as_dict()
+            scraped_dict = child.as_dict()
+            null_to_value = {}
+            update_dict = {}
+
+            for k, v in scraped_dict.items():
+                if in_db_child[k] != v:
+                    update_dict[k] = {
+                        "old": in_db_child[k],
+                        "new": v
+                    }
+                    if in_db_child[k] is None:
+                        null_to_value[k] = v
+
+            if update_dict.keys():
+                self.report.write(
+                    "============\n"
+                    "UPDATE CHILD\n"
+                    "=============\n"
+                )
+                self.report.write(
+                     "%s\n" % child.get_field("Link_to_Child_s_Page__c")
+                )
+                self.report.write("%s - %s\n" % (
+                    child.get_field("Case_Number__c"), child.get_field("Name"))
+                )
+                for k, v in update_dict.items():
+                    if k == "Children_s_Bio__c":
+                        report_str = "%s: Bio has change."
+                    else:
+                        report_str = ("%s: %s, %s" % (k, v["old"], v["new"]))
+                    self.report.write("%s\n" % report_str)
+
+                self.report.write("\n")
+
+            if null_to_value.keys():
+                self.sf.Children__c.update(
+                    child.get_field("Id"), null_to_value
+                )
         else:
+            self.report.write(
+                "=========\n"
+                "ADD CHILD\n"
+                "=========\n")
+            self.report.write(
+                "%s\n" % child.get_field("Link_to_Child_s_Page__c")
+            )
+            self.report.write("%s - %s\n" % (
+                child.get_field("Case_Number__c"), child.get_field("Name"))
+            )
             x = self.sf.Children__c.create(child.as_dict())
+            self.report.write("\n")
             child.update_field("Id", x.get("id"))
 
         # Add attachments and give the attachment's the Child object's ID
@@ -434,6 +485,13 @@ class Salesforce(object):
                 "%s != SiblingGroup: Can only add SiblingGroup "
                 "objects to the database as SiblingGroups" % type(sgroup)
             )
+        # Check for existing with TareId
+        save_fields = sgroup.get_variable_fields()
+        existing_tare_id_results = self.find_by_case_number(
+            sgroup.get_field("Case_Number__c"),
+            SiblingGroup,
+            return_fields=save_fields
+        )
         scraped_dict = sgroup.as_dict()
 
         # Child reference Id string
@@ -466,10 +524,65 @@ class Salesforce(object):
             self.log.debug("Updating sibling group with Id: %s" % gr_id)
             scraped_dict.update({"Id": gr_id})
 
+        if scraped_dict.get("Id"):
+            in_db_group = existing_group.as_dict()
+            self.log.info("Scraped CW Id: %s" % scraped_dict["Caseworker__c"])
+            null_to_value = {}
+            update_dict = {}
+
+            for k, v in scraped_dict.items():
+                if in_db_group[k] != v:
+                    update_dict[k] = {
+                        "old": in_db_group[k],
+                        "new": v
+                    }
+                    if in_db_group[k] is None:
+                        null_to_value[k] = v
+
+            if update_dict.keys():
+                self.report.write(
+                    "====================\n"
+                    "UPDATE SIBLING GROUP\n"
+                    "====================\n"
+                )
+                self.report.write(
+                     "%s\n" % scraped_dict.get("Children_s_Webpage__c")
+                )
+                self.report.write("%s - %s\n" % (
+                    scraped_dict.get("Case_Number__c"),
+                    scraped_dict.get("Name")
+                ))
+                for k, v in update_dict.items():
+                    if k == "Children_s_Bio__c":
+                        report_str = "%s: Bio has change." % k
+                    else:
+                        report_str = ("%s: %s, %s" % (k, v["old"], v["new"]))
+                    self.report.write("%s\n" % report_str)
+
+                self.report.write("\n")
+
+            self.log.info(
+                "XXXXXXXXXX: %s" % scraped_dict["Child_1_First_Name__c"]
             )
+
+            if null_to_value.keys():
+                self.sf.Sibling_Group__c.update(
+                    scraped_dict.get("Id"), null_to_value
+                )
         else:
-            x = self.sf.Sibling_Group__c.create(sgroup.as_dict())
-            sgroup.update_field("Id", x.get("id"))
+            self.report.write(
+                "=================\n"
+                "ADD SIBLING GROUP\n"
+                "=================\n"
+            )
+            self.report.write(
+                "%s\n" % scraped_dict.get("Children_s_Webpage__c")
+            )
+            self.report.write("%s - %s\n" % (
+                scraped_dict.get("Case_Number__c"), scraped_dict.get("Name"))
+            )
+            x = self.sf.Sibling_Group__c.create(scraped_dict)
+            scraped_dict.update({"Id", x.get("id")})
 
         # Add attachments and give the attachment's the Child object's ID
         attachments = list(sgroup.get_attachments())
