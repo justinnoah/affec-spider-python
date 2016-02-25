@@ -243,7 +243,7 @@ def gather_profile_details_for(link, session, base_url):
         sibling_group.update_fields({
             "Case_Number__c": tare_id,
             "Children_s_Webpage__c": link,
-            "District__c": region,
+            "District__c": "Region: %s" % region,
         })
         fields.remove("Case_Number__c")
         fields.remove("Children_s_Webpage__c")

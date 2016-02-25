@@ -292,7 +292,7 @@ class Child(_DBObject):
             # Legal Status - If Possible
             "Legal_Status2__c": "Unknown",
             # District/Region - District Number
-            "District__c": 0,
+            "District__c": None,
             # Child's County - If Possible
             "Child_s_County__c": None,
             # State Case Number - tareID
@@ -378,6 +378,8 @@ class SiblingGroup(_DBObject):
             "Children_s_Bio__c": None,
             "Caseworker_Placement_Notes__c": None,
             'Children_s_Webpage__c': None,
+            # Region
+            'District__c': None,
         }
 
         super(SiblingGroup, self).__init__(name, constants, variables)

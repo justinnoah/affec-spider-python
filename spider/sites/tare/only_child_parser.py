@@ -105,6 +105,8 @@ def parse_child_info(link, soup):
         elif field in ["Ethnicity", "Race"]:
             value = child_info.get_field(tare_provided_fields[field])
             value.append(next(itr).text.strip())
+        elif field == "Region":
+            value = "Region: %s" % next(itr).text.strip()
         elif field in tare_provided_fields.keys():
             value = next(itr).text.strip()
         # Short circuit if nothing relavent found
