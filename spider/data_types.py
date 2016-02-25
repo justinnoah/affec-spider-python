@@ -214,8 +214,6 @@ class _DBObject(object):
         """
         data = self._constant_fields
         data.update(self._variable_fields)
-        if "Id" in data.keys():
-            del data["Id"]
 
         return data
 

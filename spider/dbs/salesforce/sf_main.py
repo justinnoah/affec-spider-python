@@ -107,7 +107,6 @@ class Salesforce(object):
         children = []
 
         for res in results:
-            print("\n\n\n%s\n\n\n" % res)
             child = Child()
             child.update_fields(res)
             children.append(child)
@@ -390,12 +389,12 @@ class Salesforce(object):
         )
 
         # select fiesds, we always return at least Id
-        s_fields = ["Id"]
+        s_fields = set(["Id"])
         for field in return_fields:
-            s_fields.append(field)
+            s_fields.add(field)
 
         # Join the list of s_fields into a string separated by ", "
-        select_fields = " AND ".join(s_fields)
+        select_fields = ", ".join(s_fields)
 
         # Parse the dict indo a where clause
         w_fields = []
@@ -435,44 +434,38 @@ class Salesforce(object):
                 "%s != SiblingGroup: Can only add SiblingGroup "
                 "objects to the database as SiblingGroups" % type(sgroup)
             )
+        scraped_dict = sgroup.as_dict()
+
         # Child reference Id string
         reference_str = "Child_%d_First_Name__c"
 
         # Given a sibling group, the children should be added first
         children = sgroup.get_children()
+        children_references = {}
         for num, child in enumerate(children):
             added_child = self.add_or_update_child(child)
-            sgroup.update_field(
-                # enumerate starts at 0, the references start at 1
-                reference_str % int(int(num) + 1),
-                added_child.get_field("Id")
-            )
+            cid = added_child.get_field("Id")
+            children_references[reference_str % int(int(num) + 1)] = cid
+
+        scraped_dict.update(children_references)
+        for k, v in children_references.items():
+            self.log.info("sgroup[%s] = %s" % (k, scraped_dict.get(k)))
 
         contact = sgroup.get_field("Caseworker__c")
         added_contact = self.get_contact(contact, create=True)[0]
-        sgroup.update_field('Caseworker__c', added_contact.get_field("Id"))
-
-        # Check for existing with TareId
-        existing_tare_id_results = self.find_by_case_number(
-            sgroup.get_field("Case_Number__c"),
-            SiblingGroup
-        )
+        cid = added_contact.get_field("Id")
+        scraped_dict.update({'Caseworker__c': cid})
 
         self.log.debug("EXISTING SGROUPS: %s" % existing_tare_id_results)
 
         # Are we updating or creating?
         if not existing_tare_id_results.is_empty():
             self.log.debug("TARE Id exists in the database already, updating.")
-            existing_group = existing_tare_id_results.get_siblings()
-            for g in existing_group:
-                self.log.debug("New groups!: %s" % g)
-            gr_id = existing_group[0].get_field("Id")
+            existing_group = existing_tare_id_results.get_siblings()[0]
+            gr_id = existing_group.get_field("Id")
             self.log.debug("Updating sibling group with Id: %s" % gr_id)
-            sgroup.update_field("Id", gr_id)
+            scraped_dict.update({"Id": gr_id})
 
-        if sgroup.get_field("Id"):
-            self.sf.Sibling_Group__c.update(
-                sgroup.get_field("Id"), sgroup.as_dict()
             )
         else:
             x = self.sf.Sibling_Group__c.create(sgroup.as_dict())
@@ -483,8 +476,8 @@ class Salesforce(object):
         for attachment in attachments:
             a = self.add_attachment(
                 attachment,
-                sgroup.get_field("Id"),
-                sgroup.get_field("Name"),
+                scraped_dict.get("Id"),
+                scraped_dict.get("Name"),
                 SiblingGroup
             )
             self.log.debug("Adding attachment: %s" % a)
@@ -516,7 +509,7 @@ class Salesforce(object):
         # select fiesds, we always return at least Id
         s_fields = set(["Id"])
         for field in return_fields:
-            s_fields.append(field)
+            s_fields.add(field)
 
         # Join the list of s_fields into a string separated by ", "
         select_fields = ", ".join(s_fields)
