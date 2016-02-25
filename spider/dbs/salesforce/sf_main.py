@@ -330,8 +330,8 @@ class Salesforce(object):
                     child.get_field("Case_Number__c"), child.get_field("Name"))
                 )
                 for k, v in update_dict.items():
-                    if k == "Children_s_Bio__c":
-                        report_str = "%s: Bio has change."
+                    if k == "Child_s_Bio__c":
+                        report_str = "%s: Bio has change." % k
                     else:
                         report_str = ("%s: %s, %s" % (k, v["old"], v["new"]))
                     self.report.write("%s\n" % report_str)
