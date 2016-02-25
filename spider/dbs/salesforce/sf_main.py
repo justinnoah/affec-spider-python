@@ -499,8 +499,12 @@ class Salesforce(object):
 
         # Given a sibling group, the children should be added first
         children = sgroup.get_children()
+        c_names = [x.get_field("Name") for x in children]
         children_references = {}
         for num, child in enumerate(children):
+            names = list(c_names)
+            names.remove(child.get_field("Name"))
+            child.update_field("Child_s_Siblings__c", ", ".join(names))
             added_child = self.add_or_update_child(child)
             cid = added_child.get_field("Id")
             children_references[reference_str % int(int(num) + 1)] = cid

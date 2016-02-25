@@ -279,6 +279,7 @@ class Child(_DBObject):
             "Web_Date__c": "%s" % date.today().isoformat(),
             # Action Needed Date
             "Action_Needed_Date__c": "%s" % date.today().isoformat(),
+            "How_Child_Came_to_us__c": "TARE",
         }
 
         # Variable
@@ -308,6 +309,8 @@ class Child(_DBObject):
             "Case_Worker_Contact__c": "",
             # Multi-picklist
             "Child_s_Nationality__c": [],
+            # Other Children in the same SiblingGroup (if applicable)
+            "Child_s_Siblings__c": None,
         }
 
         super(Child, self).__init__(name, constants, variables)
