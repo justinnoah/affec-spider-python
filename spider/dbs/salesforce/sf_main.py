@@ -243,6 +243,10 @@ class Salesforce(object):
                 "objects to the database as Child objects" % type(child)
             )
 
+        self.log.info("%s - %s" % (
+            child.get_field("Case_Number__c"), child.get_field("Name")
+        ))
+
         self.log.debug("Importing Child: %s/%s - %s" % (
             child.get_field("Name"),
             child.get_field("Case_Number__c"),
@@ -485,6 +489,11 @@ class Salesforce(object):
                 "%s != SiblingGroup: Can only add SiblingGroup "
                 "objects to the database as SiblingGroups" % type(sgroup)
             )
+
+        self.log.info("%s - %s" % (
+            sgroup.get_field("Case_Number__c"), sgroup.get_field("Name")
+        ))
+
         # Check for existing with TareId
         save_fields = sgroup.get_variable_fields()
         existing_tare_id_results = self.find_by_case_number(
@@ -510,8 +519,6 @@ class Salesforce(object):
             children_references[reference_str % int(int(num) + 1)] = cid
 
         scraped_dict.update(children_references)
-        for k, v in children_references.items():
-            self.log.info("sgroup[%s] = %s" % (k, scraped_dict.get(k)))
 
         contact = sgroup.get_field("Caseworker__c")
         added_contact = self.get_contact(contact, create=True)[0]
@@ -530,7 +537,6 @@ class Salesforce(object):
 
         if scraped_dict.get("Id"):
             in_db_group = existing_group.as_dict()
-            self.log.info("Scraped CW Id: %s" % scraped_dict["Caseworker__c"])
             null_to_value = {}
             update_dict = {}
 
@@ -564,10 +570,6 @@ class Salesforce(object):
                     self.report.write("%s\n" % report_str)
 
                 self.report.write("\n")
-
-            self.log.info(
-                "XXXXXXXXXX: %s" % scraped_dict["Child_1_First_Name__c"]
-            )
 
             if null_to_value.keys():
                 self.sf.Sibling_Group__c.update(
