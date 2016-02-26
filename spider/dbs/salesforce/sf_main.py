@@ -422,8 +422,8 @@ class Salesforce(object):
             if adding:
                 a = self.add_attachment(
                     attachment,
-                    scraped_dict.get("Id"),
-                    scraped_dict.get("Name"),
+                    child.get_field("Id"),
+                    child.get_field("Name"),
                     Child,
                 )
                 self.log.debug("Adding attachment: %s" % a)
@@ -658,7 +658,7 @@ class Salesforce(object):
                 scraped_dict.get("Case_Number__c"), scraped_dict.get("Name"))
             )
             x = self.sf.Sibling_Group__c.create(scraped_dict)
-            scraped_dict.update({"Id", x.get("id")})
+            scraped_dict.update({"Id": x.get("id")})
 
         # Add attachments and give the attachment's the Child object's ID
         attachments = list(child.get_attachments())
