@@ -16,7 +16,7 @@
 
 from base64 import b64encode
 from datetime import date
-from cStringIO import StringIO
+from StringIO import StringIO
 
 from PIL import Image
 from dateutil.relativedelta import relativedelta

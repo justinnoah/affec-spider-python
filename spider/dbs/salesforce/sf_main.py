@@ -661,7 +661,7 @@ class Salesforce(object):
             scraped_dict.update({"Id": x.get("id")})
 
         # Add attachments and give the attachment's the Child object's ID
-        attachments = list(child.get_attachments())
+        attachments = list(sgroup.get_attachments())
         in_db_attachments = self._query(
             "SELECT Id,BodyLength FROM Attachment WHERE ParentId='%s'" %
             scraped_dict["Id"]
