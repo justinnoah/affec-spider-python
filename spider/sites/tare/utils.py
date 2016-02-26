@@ -70,70 +70,79 @@ def get_birthdate(age):
 
 def generate_thumbnail(img_data):
     """Create a thumbnail with height 230px."""
-    # Create thumbnail of the image using the Pillow package
-    img = Image.open(StringIO(img_data))
-    # Width and height to scale for the thumbnail
-    i_width, i_height = img.size
+    data = {"data": None, "length": None}
+    try:
+        # Create thumbnail of the image using the Pillow package
+        img = Image.open(StringIO(img_data))
+        # Width and height to scale for the thumbnail
+        i_width, i_height = img.size
 
-    # Skip really tiny images
-    if i_width <= 10 and i_height <= 10:
-        return dict({"data": None, "length": None})
+        # Skip really tiny images
+        if i_width <= 10 and i_height <= 10:
+            return dict({"data": None, "length": None})
 
-    new_width = (230 * i_width) / i_height
-    new_height = 230.0
+        new_width = (230 * i_width) / i_height
+        new_height = 230.0
 
-    # Resize the image
-    thumbnail = img.resize((int(new_width), int(new_height)), Image.ANTIALIAS)
-    in_memory_save = StringIO()
-    thumbnail.save(in_memory_save, format="jpeg")
-    in_mem_val = in_memory_save.getvalue()
-    thumbnail_b64 = b64encode(in_mem_val)
+        # Resize the image
+        thumbnail = img.resize(
+            (int(new_width), int(new_height)), Image.ANTIALIAS
+        )
+        in_memory_save = StringIO()
+        thumbnail.save(in_memory_save, format="jpeg")
+        in_mem_val = in_memory_save.getvalue()
+        thumbnail_b64 = b64encode(in_mem_val)
+        data.update({
+            "data": thumbnail_b64,
+            "length": len(in_mem_val)
+        })
+    except Exception, e:
+        log.debug("%s" % e)
 
-    return dict({
-        "data": thumbnail_b64,
-        "length": len(in_mem_val)
-    })
+    return data
 
 
 def scale_portrait(img_data):
     """Restrict the image size to a max of 1024x768 keeping original ratio."""
-    # Scale the portrait to a standard size
-    img = Image.open(StringIO(img_data))
-    in_memory_save = StringIO()
-    # Width and height to scale for the portrait
-    i_width, i_height = img.size
+    try:
+        data = {}
+        # Scale the portrait to a standard size
+        img = Image.open(StringIO(img_data))
+        in_memory_save = StringIO()
+        # Width and height to scale for the portrait
+        i_width, i_height = img.size
 
-    # Skip image if it's tiny
-    if i_width <= 10 and i_height <= 10:
-        return None
+        # Skip image if it's tiny
+        if i_width <= 10 and i_height <= 10:
+            return None
 
-    data = {}
+        # Do not rescale if smaller than 1024x768
+        if i_width < 1024 and i_height < 768:
+            img.save(in_memory_save, format="jpeg")
+            in_mem_val = in_memory_save.getvalue()
+            data["length"] = len(in_mem_val)
+            data["data"] = b64encode(in_mem_val)
+            return data
 
-    # Do not rescale if smaller than 1024x768
-    if i_width < 1024 and i_height < 768:
-        img.save(in_memory_save, format="jpeg")
+        # If wider than tall
+        if i_width >= i_height:
+            new_width = 768
+            new_height = (768 * i_height) / i_width
+        # if taller than wide
+        else:
+            new_height = 1024
+            new_width = (1024 * i_width) / i_height
+
+        scaled = img.resize((int(new_width), int(new_height)), Image.ANTIALIAS)
+        scaled.save(in_memory_save, format="jpeg")
         in_mem_val = in_memory_save.getvalue()
+
         data["length"] = len(in_mem_val)
         data["data"] = b64encode(in_mem_val)
         return data
-
-    # If wider than tall
-    if i_width >= i_height:
-        new_width = 768
-        new_height = (768 * i_height) / i_width
-    # if taller than wide
-    else:
-        new_height = 1024
-        new_width = (1024 * i_width) / i_height
-
-    scaled = img.resize((int(new_width), int(new_height)), Image.ANTIALIAS)
-    scaled.save(in_memory_save, format="jpeg")
-    in_mem_val = in_memory_save.getvalue()
-
-    data["length"] = len(in_mem_val)
-    data["data"] = b64encode(in_mem_val)
-
-    return data
+    except Exception, e:
+        log.debug("%s" % e)
+        return None
 
 
 def get_pictures_encoded(session, base_url, urls, thumbnail=False):
