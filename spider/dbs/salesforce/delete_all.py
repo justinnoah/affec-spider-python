@@ -58,11 +58,8 @@ def delete_em_all(w, sf):
     ids = [[r["Id"]] for r in all_of_them["records"]]
     job = SalesforceBulkJob('delete', w)
     job.upload(["Id"], ids)
-    try:
-        reses = [res for res in job.results()]
-        print(reses)
-    except:
-        pass
+    # Simply waits for jobs to finish
+    [res for res in job.results()]
 
 
 def main(arg):
