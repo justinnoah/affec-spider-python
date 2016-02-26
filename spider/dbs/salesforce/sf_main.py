@@ -351,7 +351,9 @@ class Salesforce(object):
                 if "Recruitment_Update__c" in keys and len(keys) == 1
                 else False
             )
+            self.log.debug("Non-Update? %s" % non_update)
             if keys and not non_update:
+                self.log.debug("Keys: %s" % keys)
                 self.report.write(
                     "============\n"
                     "UPDATE CHILD\n"
@@ -615,7 +617,9 @@ class Salesforce(object):
                 if "Recruitment_Update__c" in keys and len(keys) == 1
                 else False
             )
+            self.log.debug("Non-Update? %s" % non_update)
             if keys and not non_update:
+                self.log.debug("Keys: %s" % keys)
                 self.report.write(
                     "====================\n"
                     "UPDATE SIBLING GROUP\n"
