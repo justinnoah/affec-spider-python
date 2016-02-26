@@ -44,7 +44,7 @@ class Salesforce(object):
         """Verify the necessary inputs for salesforce are provided."""
         self.log.debug("Verifying configuration")
 
-        keys = ['username', 'password', 'token', 'sandbox']
+        keys = ['username', 'password', 'token', 'sandbox', 'contact_account']
         for key in keys:
             if key not in config.keys():
                 raise Exception(
@@ -757,6 +757,7 @@ class Salesforce(object):
                 "add_contact requires a Contact object as an argument"
             )
         self.log.debug("add_contact: %s" % contact.name())
+        contact.update_field("AccountId", self.config['contact_account'])
         returned = self.sf.Contact.create(contact.as_dict()).get("id")
         contact.update_field("Id", returned)
         return contact

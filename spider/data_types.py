@@ -423,13 +423,13 @@ class Contact(_DBObject):
         name = "Contact__c"
 
         constants = {
-            "AccountId": "0014B0000048cGK",
             "Business_Name__c": "Techildrenas DFPS",
             "Last_Action__c":
                 "%s entered by TARE spider." % datetime.now().isoformat(' ')
         }
 
         variables = {
+            "AccountId": '',
             'FirstName': '',
             'LastName': '',
             'Email': '',
