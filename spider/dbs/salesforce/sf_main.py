@@ -15,6 +15,8 @@
 """Salesforce plugin for AFFEC Spider."""
 
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
+from dateutil.parser import parse as bday_parse
 import re
 
 from bs4 import BeautifulSoup
@@ -265,7 +267,7 @@ class Salesforce(object):
             return_fields=save_fields
         )
 
-        # Are we updating or creating?
+        # If a Children__c object exists with the given tare id
         if not existing_tare_id_results.is_empty():
             self.log.debug("TARE Id exists in the database already, updating.")
             existing_child = existing_tare_id_results.get_children()[0]
@@ -312,11 +314,30 @@ class Salesforce(object):
         if child_id:
             in_db_child = existing_child.as_dict()
             scraped_dict = child.as_dict()
+            if "Child_Bulletin_Date__c" in scraped_dict:
+                del scraped_dict["Child_Bulletin_Date__c"]
+            if "Child_Bulletin_Date__c" in in_db_child:
+                del in_db_child["Child_Bulletin_Date__c"]
             null_to_value = {}
             update_dict = {}
 
             for k, v in scraped_dict.items():
                 if in_db_child[k] != v:
+                    # Birthday check
+                    if k == "Child_s_Birthdate__c":
+                        # Bday from site
+                        scraped_bday = bday_parse(v)
+                        # Bday currently in the DB
+                        db_bday = bday_parse(in_db_child[k])
+                        # Six months
+                        three_months = relativedelta(months=3)
+                        # Acceptable bounds for a birthdate
+                        lower_bound = db_bday - three_months
+                        upper_bound = db_bday + three_months
+                        # If within range, skip
+                        if lower_bound <= scraped_bday <= upper_bound:
+                            continue
+
                     update_dict[k] = {
                         "old": in_db_child[k],
                         "new": v
@@ -324,11 +345,17 @@ class Salesforce(object):
                     if in_db_child[k] is None:
                         null_to_value[k] = v
 
-            if update_dict.keys():
+            keys = update_dict.keys()
+            non_update = (
+                True
+                if "Recruitment_Update__c" in keys and len(keys) == 1
+                else False
+            )
+            if keys and not non_update:
                 self.report.write(
                     "============\n"
                     "UPDATE CHILD\n"
-                    "=============\n"
+                    "============\n"
                 )
                 self.report.write(
                      "%s\n" % child.get_field("Link_to_Child_s_Page__c")
@@ -566,6 +593,10 @@ class Salesforce(object):
 
         if scraped_dict.get("Id"):
             in_db_group = existing_group.as_dict()
+            if "Child_Bulletin_Date__c" in scraped_dict:
+                del scraped_dict["Child_Bulletin_Date__c"]
+            if "Child_Bulletin_Date__c" in in_db_group:
+                del in_db_group["Child_Bulletin_Date__c"]
             null_to_value = {}
             update_dict = {}
 
@@ -578,7 +609,13 @@ class Salesforce(object):
                     if in_db_group[k] is None:
                         null_to_value[k] = v
 
-            if update_dict.keys():
+            keys = update_dict.keys()
+            non_update = (
+                True
+                if "Recruitment_Update__c" in keys and len(keys) == 1
+                else False
+            )
+            if keys and not non_update:
                 self.report.write(
                     "====================\n"
                     "UPDATE SIBLING GROUP\n"
@@ -806,12 +843,11 @@ class Salesforce(object):
         self.log.debug("QUERY RESULTS:\n%s\n" % unicode(r))
         results = self._results_to_contacts(r)
 
-        # FIXME: Need to convert results to proper data types
         if (not results) and create:
             self.log.debug("Creating contact")
             results = self.add_contact(contact)
 
-        # FIXME: Only handling the one most likely. This Needs to change.
+        # FIXME: Only handling the one most likely. This may need to change.
         if results:
             return [results] if not type(results) == list else results
         else:

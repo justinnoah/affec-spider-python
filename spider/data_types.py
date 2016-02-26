@@ -311,6 +311,7 @@ class Child(_DBObject):
             "Child_s_Nationality__c": [],
             # Other Children in the same SiblingGroup (if applicable)
             "Child_s_Siblings__c": None,
+            "Child_s_Birthdate__c": None,
         }
 
         super(Child, self).__init__(name, constants, variables)
