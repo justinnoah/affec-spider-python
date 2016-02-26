@@ -73,3 +73,4 @@ target/
 
 ### Project Specific ###
 config.ini
+Report*.txt

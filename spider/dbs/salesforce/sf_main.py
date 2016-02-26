@@ -14,6 +14,7 @@
 
 """Salesforce plugin for AFFEC Spider."""
 
+from datetime import datetime
 import re
 
 from bs4 import BeautifulSoup
@@ -70,7 +71,9 @@ class Salesforce(object):
             security_token=self.config['token'],
             sandbox=bool(self.config['sandbox']),
         )
-        self.report = open("Report.txt", 'w')
+        # Report with a datetime string appended
+        n = datetime.now().isoformat().replace(":", "-")
+        self.report = open("Report_%s.txt" % n, 'w')
 
         self.nationalities = []
 
