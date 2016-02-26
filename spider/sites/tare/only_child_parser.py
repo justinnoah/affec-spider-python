@@ -284,16 +284,23 @@ def parse_attachments(cname, session, souped, base_url):
 
     # Create attachments for the profile and thumbnail of the profile
     for img in profile_image_data:
-        for k, v in img.iteritems():
+        for k, v in img.items():
             name = "%s-%s.jpg" % (cname, str(random.randint(100, 999)))
-            attachments_returned.append(create_attachment(v, name))
+            attch = create_attachment(v["data"], name)
+            attch.update_field("BodyLength", v["length"])
+            if k == "full":
+                attch.is_profile = True
+            attachments_returned.append(attch)
 
     # Create attachments of all other images and append a number to the name
     for i, img in enumerate(other_images):
         # For non-Profile pictures, we just want the full image.
         # thumbnail is None anyway
         name = "%s-%s.jpg" % (cname, str(random.randint(100, 999)))
-        attachments_returned.append((create_attachment(img.get("full"), name)))
+        full = img.get("full")
+        attch = create_attachment(full.get("data"), name)
+        attch.update_field("BodyLength", full.get("length"))
+        attachments_returned.append(attch)
 
     log.debug("Returning %s attachments for %s" % (
         len(attachments_returned), cname)

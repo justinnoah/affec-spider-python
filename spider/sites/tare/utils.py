@@ -74,6 +74,11 @@ def generate_thumbnail(img_data):
     img = Image.open(StringIO(img_data))
     # Width and height to scale for the thumbnail
     i_width, i_height = img.size
+
+    # Skip really tiny images
+    if i_width <= 10 and i_height <= 10:
+        return dict({"data": None, "length": None})
+
     new_width = (230 * i_width) / i_height
     new_height = 230.0
 
@@ -81,9 +86,13 @@ def generate_thumbnail(img_data):
     thumbnail = img.resize((int(new_width), int(new_height)), Image.ANTIALIAS)
     in_memory_save = StringIO()
     thumbnail.save(in_memory_save, format="jpeg")
-    thumbnail_b64 = b64encode(in_memory_save.getvalue())
+    in_mem_val = in_memory_save.getvalue()
+    thumbnail_b64 = b64encode(in_mem_val)
 
-    return thumbnail_b64
+    return dict({
+        "data": thumbnail_b64,
+        "length": len(in_mem_val)
+    })
 
 
 def scale_portrait(img_data):
@@ -94,10 +103,19 @@ def scale_portrait(img_data):
     # Width and height to scale for the portrait
     i_width, i_height = img.size
 
+    # Skip image if it's tiny
+    if i_width <= 10 and i_height <= 10:
+        return None
+
+    data = {}
+
     # Do not rescale if smaller than 1024x768
     if i_width < 1024 and i_height < 768:
         img.save(in_memory_save, format="jpeg")
-        return b64encode(in_memory_save.getvalue())
+        in_mem_val = in_memory_save.getvalue()
+        data["length"] = len(in_mem_val)
+        data["data"] = b64encode(in_mem_val)
+        return data
 
     # If wider than tall
     if i_width >= i_height:
@@ -110,7 +128,12 @@ def scale_portrait(img_data):
 
     scaled = img.resize((int(new_width), int(new_height)), Image.ANTIALIAS)
     scaled.save(in_memory_save, format="jpeg")
-    return b64encode(in_memory_save.getvalue())
+    in_mem_val = in_memory_save.getvalue()
+
+    data["length"] = len(in_mem_val)
+    data["data"] = b64encode(in_mem_val)
+
+    return data
 
 
 def get_pictures_encoded(session, base_url, urls, thumbnail=False):
@@ -125,7 +148,9 @@ def get_pictures_encoded(session, base_url, urls, thumbnail=False):
         # Thumbnail
         thumbnail_b64 = None if not thumbnail else generate_thumbnail(img_data)
 
-        data.append({'full': img_data_b64, 'thumbnail': thumbnail_b64})
+        data.append({
+            'full': img_data_b64, 'thumbnail': thumbnail_b64
+        })
 
     # Return a dictionary containing the base64 encoded versions
     # of the thumbnail and the full image

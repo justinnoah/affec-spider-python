@@ -118,7 +118,7 @@ def parse_attachments(sgname, session, souped, base_url):
         other_img_tags = gallery.find_all("img", class_="galleryImage")
         for tag in other_img_tags:
             if tag.get("src"):
-                urls.append(tag.src)
+                urls.append(tag.get("src"))
 
         # Get other images
     other_images = get_pictures_encoded(
@@ -135,11 +135,15 @@ def parse_attachments(sgname, session, souped, base_url):
 
     # Create attachments for the profile and thumbnail of the profile
     for img in profile_image_data:
-        for k, v in img.iteritems():
+        for k, v in img.items():
             name = "%s-%s.jpg" % (
                 sgname, str(random.randint(100, 999))
             )
-            attachments_returned.append((create_attachment(v, name)))
+            attch = create_attachment(v["data"], name)
+            attch.update_field("BodyLength", v["length"])
+            if k == "full":
+                attch.is_profile = True
+            attachments_returned.append(attch)
 
     # Create attachments of all other images and append a number to the name
     for i, img in enumerate(other_images):
@@ -148,7 +152,14 @@ def parse_attachments(sgname, session, souped, base_url):
         name = "%s-%s.jpg" % (
             sgname, str(random.randint(100, 999))
         )
-        attachments_returned.append((create_attachment(img.get("full"), name)))
+        full = img.get("full")
+        attch = create_attachment(full.get("data"), name)
+        attch.update_field("BodyLength", full.get("length"))
+        attachments_returned.append(attch)
+
+    log.debug("Returning %s attachments for %s" % (
+        len(attachments_returned), sgname)
+    )
 
     return list(attachments_returned)
 

@@ -46,7 +46,7 @@ def load_config(path="./config.ini"):
     elif 'plugin' not in config['database']:
         raise ConfigObjError("Section [database] is missing a plugin!")
 
-    return config
+    return config['database']
 
 
 def delete_em_all(w, sf):
@@ -71,22 +71,27 @@ def main(arg):
 
     # bulk operations config
     os.environ['SALESFORCE_INSTANCE'] = ""
-    os.environ['SALESFORCE_SANDBOX'] = config['salesforce']['sandbox']
-    os.environ['SALESFORCE_USERNAME'] = config['salesforce']['username']
-    os.environ['SALESFORCE_PASSWORD'] = config['salesforce']['password']
-    os.environ['SALESFORCE_SECURITY_TOKEN'] = config['salesforce']['token']
+    os.environ['SALESFORCE_SANDBOX'] = config['Salesforce']['sandbox']
+    os.environ['SALESFORCE_USERNAME'] = config['Salesforce']['username']
+    os.environ['SALESFORCE_PASSWORD'] = config['Salesforce']['password']
+    os.environ['SALESFORCE_SECURITY_TOKEN'] = config['Salesforce']['token']
 
     # Non-bulk operations config
     sf = Salesforce(
-        username=config['salesforce']['username'],
-        password=config['salesforce']['password'],
-        security_token=config['salesforce']['token'],
-        sandbox=config['salesforce']['sandbox'],
+        username=config['Salesforce']['username'],
+        password=config['Salesforce']['password'],
+        security_token=config['Salesforce']['token'],
+        sandbox=config['Salesforce']['sandbox'],
     )
 
-    opts = ["siblings", "children", "contacts", "attachments"]
+    opts = {
+        "siblings": "Sibling_Group__c",
+        "children": "Children__c",
+        "contacts": "Contact",
+        "attachments": "Attachment",
+    }
     if arg in opts:
-        delete_em_all(arg, sf)
+        delete_em_all(opts[arg], sf)
     elif arg == "all":
         for opt in opts:
             delete_em_all(opt, sf)

@@ -479,5 +479,7 @@ class Attachment(_DBObject):
 
         super(Attachment, self).__init__(name, constants, variables)
 
+        self.is_profile = False
+
 
 __all__ = [Child, SiblingGroup, Attachment, Contact]

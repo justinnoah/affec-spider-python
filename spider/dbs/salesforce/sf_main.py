@@ -362,23 +362,39 @@ class Salesforce(object):
             child.update_field("Id", x.get("id"))
 
         # Add attachments and give the attachment's the Child object's ID
-        attachments = child.get_attachments()
-        self.log.debug(
-            "Adding %s attachments for %s from\n\t%s." % (
-                len(attachments),
-                child.get_field("Name"),
-                child.get_field("Link_to_Child_s_Page__c"),
-            )
+        attachments = list(child.get_attachments())
+        in_db_attachments = self._query(
+            "SELECT Id,BodyLength FROM Attachment WHERE ParentId='%s'" %
+            child.get_field("Id")
         )
+        current_body_sizes = [
+            a["BodyLength"] for a in in_db_attachments["records"]
+        ]
+
+        # self.log.info("New:\n%s" % sorted(new_body_sizes))
         for attachment in attachments:
-            self.log.debug(
-                self.add_attachment(
+            # Is the attachment going into the db?
+            adding = True
+            bs = None
+            for bs in current_body_sizes:
+                if attachment.get_field("BodyLength") == bs:
+                    # In this instance, more than likely, the attachment
+                    # is already in the database, so we skip it
+                    adding = False
+                    break
+
+            # Remove already added items
+            if bs and adding:
+                current_body_sizes.remove(bs)
+
+            if adding:
+                a = self.add_attachment(
                     attachment,
-                    child.get_field("Id"),
-                    child.get_field('FirstName'),
+                    scraped_dict.get("Id"),
+                    scraped_dict.get("Name"),
                     Child,
                 )
-            )
+                self.log.debug("Adding attachment: %s" % a)
 
         return child
 
@@ -401,26 +417,36 @@ class Salesforce(object):
         @rtype: OrderedDict
         @return: Attachment ID
         """
+        self.log.info("Adding attachment")
+        # Add the ParentId to the attachment
         attachment.update_field("ParentId", sid)
-        b64_data = attachment.get_field("Body")
-        img = BeautifulSoup('', 'lxml')
-        img_tag = img.new_tag(
-            "img",
-            alt=name,
-            src="data:image/jpeg;base64,%s===" % b64_data,
-        )
-        img.append(img_tag)
-        if t is Child:
-            self.sf.Children__c.update(
-                sid,
-                {'Child_s_Photo__c': img.prettify()}
+        # Create said attachment
+        attach_dict = attachment.as_dict()
+        del attach_dict["BodyLength"]
+        attached = self.sf.Attachment.create(attach_dict)
+
+        # If this is the profile pic on the page, let's add it to the db object
+        if attachment.is_profile:
+            b64_data = attachment.get_field("Body")
+            img = BeautifulSoup('', 'lxml')
+            img_tag = img.new_tag(
+                "img",
+                alt=name,
+                src="data:image/jpeg;base64,%s" % b64_data,
             )
-        elif t is SiblingGroup:
-            self.sf.Sibling_Group__c.update(
-                sid,
-                {'Sibling_Photo__c': img.prettify()}
-            )
-        attached = self.sf.Attachment.create(attachment.as_dict())
+            img.append(img_tag)
+            if t is Child:
+                self.sf.Children__c.update(
+                    sid,
+                    {'Child_s_Photo__c': img.prettify()}
+                )
+            elif t is SiblingGroup:
+                self.sf.Sibling_Group__c.update(
+                    sid,
+                    {'Sibling_Photo__c': img.prettify()}
+                )
+
+        # Return the sf results
         return attached
 
     def get_children_by(self, search_criteria, return_fields=[]):
@@ -591,15 +617,39 @@ class Salesforce(object):
             scraped_dict.update({"Id", x.get("id")})
 
         # Add attachments and give the attachment's the Child object's ID
-        attachments = list(sgroup.get_attachments())
+        attachments = list(child.get_attachments())
+        in_db_attachments = self._query(
+            "SELECT Id,BodyLength FROM Attachment WHERE ParentId='%s'" %
+            scraped_dict["Id"]
+        )
+        current_body_sizes = [
+            a["BodyLength"] for a in in_db_attachments["records"]
+        ]
+
+        # self.log.info("New:\n%s" % sorted(new_body_sizes))
         for attachment in attachments:
-            a = self.add_attachment(
-                attachment,
-                scraped_dict.get("Id"),
-                scraped_dict.get("Name"),
-                SiblingGroup
-            )
-            self.log.debug("Adding attachment: %s" % a)
+            # Is the attachment going into the db?
+            adding = True
+            bs = None
+            for bs in current_body_sizes:
+                if attachment.get_field("BodyLength") == bs:
+                    # In this instance, more than likely, the attachment
+                    # is already in the database, so we skip it
+                    adding = False
+                    break
+
+            # Remove already added items
+            if bs and adding:
+                current_body_sizes.remove(bs)
+
+            if adding:
+                a = self.add_attachment(
+                    attachment,
+                    scraped_dict.get("Id"),
+                    scraped_dict.get("Name"),
+                    SiblingGroup,
+                )
+                self.log.debug("Adding attachment: %s" % a)
 
         return sgroup
 
