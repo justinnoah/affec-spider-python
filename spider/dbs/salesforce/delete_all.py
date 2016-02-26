@@ -59,7 +59,10 @@ def delete_em_all(w, sf):
     job = SalesforceBulkJob('delete', w)
     job.upload(["Id"], ids)
     # Simply waits for jobs to finish
-    [res for res in job.results()]
+    try:
+        [res for res in job.results()]
+    except:
+        pass
 
 
 def main(arg):
@@ -90,8 +93,8 @@ def main(arg):
     if arg in opts:
         delete_em_all(opts[arg], sf)
     elif arg == "all":
-        for opt in opts:
-            delete_em_all(opt, sf)
+        for k, v in opts.items():
+            delete_em_all(v, sf)
     else:
         print("Unknown type: %s" % arg)
 
