@@ -58,8 +58,10 @@ CONTACT_SELECTORS = {
 }
 
 ATTACHMENT_SELECTORS = {
-    "profile_picture": "div#pageContent > div > div > a > img",
-    "other_pictures": "div.galleryImage > a > img"
+    "profile_picture": (
+        "div#pageContent > div > div.galleryImage > a.imageLightbox"
+    ),
+    "other_pictures": "div#contentGallery > div",
 
 }
 
@@ -102,12 +104,12 @@ def parse_attachments(sgname, session, souped, base_url):
     sgname = sgname.replace(", ", "")
 
     try:
-        profile_img_tag = souped.select(
+        profile_img_tag = souped.select_one(
             ATTACHMENT_SELECTORS["profile_picture"]
-        )[0]
-        if profile_img_tag.get("src"):
+        )
+        if profile_img_tag.get("href"):
             profile_image_data = get_pictures_encoded(
-                session, base_url, [profile_img_tag.get("src")], True
+                session, base_url, [profile_img_tag.get("href")], True
             )
     except IndexError:
         profile_image_data = {'full': None, 'thumbnail': None}
@@ -115,10 +117,10 @@ def parse_attachments(sgname, session, souped, base_url):
     gallery = souped.select_one(ATTACHMENT_SELECTORS.get("other_pictures"))
     urls = []
     if gallery:
-        other_img_tags = gallery.find_all("img", class_="galleryImage")
+        other_img_tags = gallery.find_all("a", class_="imageLightbox")
         for tag in other_img_tags:
-            if tag.get("src"):
-                urls.append(tag.get("src"))
+            if tag.get("href"):
+                urls.append(tag.get("href"))
 
         # Get other images
     other_images = get_pictures_encoded(
@@ -136,14 +138,15 @@ def parse_attachments(sgname, session, souped, base_url):
     # Create attachments for the profile and thumbnail of the profile
     for img in profile_image_data:
         for k, v in img.items():
-            name = "%s-%s.jpg" % (
-                sgname, str(random.randint(100, 999))
-            )
-            attch = create_attachment(v["data"], name)
-            attch.update_field("BodyLength", v["length"])
-            if k == "full":
-                attch.is_profile = True
-            attachments_returned.append(attch)
+            if v:
+                name = "%s-%s.jpg" % (
+                    sgname, str(random.randint(100, 999))
+                )
+                attch = create_attachment(v["data"], name)
+                attch.update_field("BodyLength", v["length"])
+                if k == "full":
+                    attch.is_profile = True
+                attachments_returned.append(attch)
 
     # Create attachments of all other images and append a number to the name
     for i, img in enumerate(other_images):
@@ -153,9 +156,10 @@ def parse_attachments(sgname, session, souped, base_url):
             sgname, str(random.randint(100, 999))
         )
         full = img.get("full")
-        attch = create_attachment(full.get("data"), name)
-        attch.update_field("BodyLength", full.get("length"))
-        attachments_returned.append(attch)
+        if full:
+            attch = create_attachment(full.get("data"), name)
+            attch.update_field("BodyLength", full.get("length"))
+            attachments_returned.append(attch)
 
     log.debug("Returning %s attachments for %s" % (
         len(attachments_returned), sgname)
